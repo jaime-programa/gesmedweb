@@ -1,0 +1,2 @@
+"IMAGENES_OK":"/Users/jaime/imagenes_gesmed/"
+"ESCANEADOS_BRUTO":"/Users/jaime/Software/Reflex/GesmedWeb/usuario/jaime/escaneados_paso/"

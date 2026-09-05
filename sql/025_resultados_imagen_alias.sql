@@ -1,0 +1,2 @@
+ALTER TABLE resultados_imagen
+    ADD COLUMN alias VARCHAR(80) NULL DEFAULT NULL;

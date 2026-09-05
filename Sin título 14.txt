@@ -1,0 +1,309 @@
+Crea una UI para que un médico pueda construir un pedido de examenes de laboratorio en base a la lista de todos los examenes que se pueden filtrar por nombre o por grupo.  Todos los examenes disponibles se muestran en una tabla a la izquierda y pueden ser arrastrados a una tabla vacía a la derecha que se irá llenando con los examenes seleccionados. El médico también podrá eliminar examenes solicitados por error. Es importante mostrar el nombre del examen pero también el grupo en las tablas (para evitar confusiones al médico).  Esta UI debe insertarse en el offcanvas_pedido_examenes y sus componentes deben estar deshabilitados hasta que no exista un SOAP válido grabado. En la parte superior del offcanvas_pedido_examenes se debe incluir un botón para "Grabar Pedido", "Editar Pedido", "Guardar Cambios" de la misma manera que se hizo con los otros offcanvas ya diseñados. Se debe añadir un botón "Imprimir Pedido" cuya función que se implementará más tarde.
+
+['tomato', 'red', 'ruby', 'crimson', 'pink', 'plum', 'purple', 
+'violet', 'iris', 'indigo', 'blue', 'cyan', 'teal', 'jade', 'green', 'grass', 'brown', 'orange', 'sky', 'mint', 'lime', 'yellow', 'amber', 'gold', 
+'bronze', 'gray']
+
+create table public.proceso_mentoria (
+  id serial not null,
+  nombre_proceso character varying not null,
+  costo character varying not null,
+  costo_noasiste character varying not null,
+  activo boolean not null,
+  lk_alectivo integer not null,
+  constraint proceso_mentoria_pkey primary key (id)
+) TABLESPACE pg_default;
+
+=====
+Necesito un método que me permita hacer el mantenimiento de la tabla "comonueva" de supabase.
+Crear:
+Para ello he incluido unos controles en la UI (Qt) configura_skholeweb.ui
+El usuario puede insertar nuevos registros seleccionando el régimen a través de un combobox "combo_regimen_3" los datos para rellenar el combobox vienen de la tabla skhole.regimen (id_regimen,que_regimen), con el régimen seleccionado (se necesita id_regimen de la selección del primer combobox) se pasa a rellenar el siguiente combobox: "combo_familia_3" (que mostrará el código_familia y los apellidos en base a las tablas skhole.control_familia y skhole.familia (adjunto la estructura de las tablas)
+Cuando el usuario haya seleccionado los datos en los 2 combobox se habilitará el botón "b_aplica_3" y al hacer click se debe insertar los valores de lk_regimen y lk_familia en la tabla "comonueva" de supabase
+La tabla QtTableWidget "tabla_antiguas_nuevas_3" (que está en la interface configura_skholeweb.ui ) debe presentar los datos de la tabla "comonueva" de supabase, y se actualizará luego de que el usuario inserte o borre valores. La primera columna de la tabla debe mostrar el código de la familia + los apellidos, la segunda columna debe mostrar el botón para eliminar el registro de supabase. Antes de eliminar un registro se debe pedir confirmación al usuario.
+Delete:
+El proceso de borrar un registro se realiza a través de la "tabla_antiguas_nuevas_3" que contiene el botón para eliminar un registro.
+
+====
+En offcanvas_pedido_examenes necesito organizar la información en 3 tabs: Examenes Laboratorio, Examenes Imagen, Otros Examenes. Todos los componentes actuales (formulario y controles) trasladados al interior del tab Examenes Laboratorio. El tab examenes Imagen y Otros examenes marcados como "en construcción"
+
+Hice un plano aproximado de la casa de mi suegra y ubique tentativamente las cámaras.
+Me puede ayudar con un par de cotizaciones:
+Opción A: DVR para 8 cámaras : (7 cámaras interiores + 1 cámara exterior)
+Opción B: DVR para 16 cámaras : (7 cámaras interiores + 3 cámaras exteriores)
+Por favor ayúdeme detallando el costo de instalación por m2 en interior y el costo de instalación por m2 en exterior (porque hay un par de cámaras distantes), el costo de una cámara adicional para interiores, de una cámara adicional para exteriores y de una cámara PTZ para exterior.
+
+
+===
+# 1. Instalar Docker Desktop para Mac (si no lo tienes)
+#    https://www.docker.com/products/docker-desktop/
+
+# 2. Descargar la imagen oficial de buildozer
+docker pull kivy/buildozer
+
+# 3. Desde la carpeta del proyecto, lanzar el build
+cd /Users/jaime/Software/YoBusco/AppCampo
+docker run --volume "$(pwd)":/home/user/hostcwd kivy/buildozer \
+    android debug
+
+====
+Reemplaza el popover Alergias con un menu desplegable hacia abajo con las opciones de "imprimir..":
+Reporte form002, Pedido Laboratorio, Pedido Imágen, Certificado, Prescripción (Receta)
+====
+Reduce en 2px el tamaño de las fuentes de todos los componentes que se despliegan en el navbar, a excepción de los elementos del menú impresión y el botón salir
+
+===
+Al primer botón del navbar (Pencil) agrégale la acción que al hacer click invoque el diálogo para editar la información del paciente actual (EditPacienteState.abrir_datos_paciente). Luego a la izquierda de este botón añade otro botón que desplegará un offcanvas con ancho 200px que debe aparecer desde el lado izquierdo. Este offcanvas "offcanvas menú" tendrá algunos botones (que definiré más adelante) que servirán para invocar operaciones de configuración y mantenimiento  
+
+=== @@@@@
+Cuando quieras agregar los botones de configuración/mantenimiento al offcanvas, los pones dentro del rx.vstack de offcanvas_menu() en dialogos.py:1501.
+=== @@@@@
+
+Construye una nueva página (UI) que servirá para hacer mantenimiento de los formatos impresos. Te adjunto un modelo gráfico de referencia.
+Deben haber de 3 bloques: Bloque 1 (izquierda arriba): Tabla de reportes impresos registrados en la tabla "impreso" con los respectivos botones(iconos) para editar y eliminar registros. En la columna de Fuente se debe mostrar la lista De Fuentes disponibles (en el modo edición). El botón "Nuevo Reporte" debe invocar un diálogo que contiene el formulario para registrar un nuevo impreso. La selección de reporte en el bloque 1 sirve para filtrar los elementos que se despliegan en el bloque 2.
+Bloque 2 (izquierda abajo): Tabla "sección" con registros que están vinculados al "impreso" seleccionado en el bloque 1. Cada registro de esta tabla debe incluir los botones (iconos) para editar y eliminar registros de esta tabla. Debido a que la columna "instruccion_sql" almacena un string extenso, se debe mostrar el contenido en un control de texto fuera de la tabla. 
+Bloque 3 (derecha arriba y abajo): Tabla "celda" con registros vinculados a la sección seleccionada en el bloque 2.
+Se incluyen controles de tipo input, sliders, selectores, check para establecer el formato aplicado a la celda. (Revisar el formato establecido). Al seleccionar un registro de la tabla "celda" los controles deben reflejar los valores del formato de la celda seleccionada.
+
+Antes de escribir código quiero confirmar que te he explicado con claridad lo que necesito, por favor, haz las preguntas necesarias para aclarar el funcionamiento de la UI.
+
+====
+En mi aplicación, tengo usuarios [amauta] de 2 tipos: Educadores-Tutores y Administrativos.
+Todas las familias tienen un tutor asignado. 
+Cada tutor gestiona varias familias.
+Cada tutor es responsable de generar reportes de acompañamiento de sus familias.(en un formato parametrizado)
+Los usuarios pueden mirar las familias y reportes de los tutores, pero no pueden modificar sus reportes.
+
+
+Tengo 3 tablas con las que manejo esta lógica:
+que_familias_ve: (tabla que establece qué [amauta] puede mirar las familias que gestiona un tutor.
+que_familias_modifica: (tabla que establece qué [amauta] puede modificar o crear reportes sobre las familias gestionadas por un tutor. (Por lo general el propio tutor aparece como amauta).
+que_reportes_mira: (tabla que establece el control de qué usuario[amauta] puede leer los reportes que otro usuario [amauta] generó.
+
+Necesito una interfaz UI intuitiva para gestionar esta lógica. Mi primera idea era utilizar 3 cuadros de doble entrada. El primero establece la relación de la tabla que_familias_ve, donde en el un eje están todos los amautas y en el otro eje aparecen los tutores y mediante checks se establece qué amauta mira a qué tutor. El segundo cuadro también de doble entrada establece la relación de la tabla que_familias_modifica de la misma manera en el eje horizontal aparecen los amputas y en el eje vertical los tutores y mediante checks se establece qué amauta puede modificar las familias de qué tutor. Y finalmente un tercer cuadro de doble entrada donde mediante checks se establece qué amauta puede mirar los reportes generados por otro amauta.
+
+Podemos discutir esta alternativa o encontrar una mejor (sin generar todavía ningún código). Te adjunto los esquemas de las tablas implicadas.
+create table public.amauta (
+  id serial not null,
+  nombre character varying not null,
+  alias character varying not null,
+  email character varying not null,
+  celular character varying not null,
+  usuario character varying not null,
+  clave character varying not null,
+  permisos character varying not null,
+  estado character varying not null,
+  constraint amauta_pkey primary key (id)
+) TABLESPACE pg_default;
+
+create table public.amautatutor (
+  id serial not null,
+  lk_amauta integer not null,
+  lk_tutor character varying not null,
+  constraint amautatutor_pkey primary key (id),
+  constraint amautatutor_lk_amauta_fkey foreign KEY (lk_amauta) references amauta (id),
+  constraint amautatutor_lk_tutor_fkey foreign KEY (lk_tutor) references tutor (cu_)
+) TABLESPACE pg_default;
+
+ create table public.que_familias_ve (
+  id serial not null,
+  lk_amauta integer not null,
+  lk_tutor character varying not null,
+  constraint que_familias_ve_pkey primary key (id),
+  constraint que_familias_ve_lk_amauta_fkey foreign KEY (lk_amauta) references amauta (id),
+  constraint que_familias_ve_lk_tutor_fkey foreign KEY (lk_tutor) references tutor (cu_)
+) TABLESPACE pg_default;
+
+create table public.que_familias_modifica (
+  id serial not null,
+  lk_amauta integer not null,
+  lk_tutor character varying not null,
+  constraint que_familias_modifica_pkey primary key (id),
+  constraint que_familias_modifica_lk_amauta_fkey foreign KEY (lk_amauta) references amauta (id),
+  constraint que_familias_modifica_lk_tutor_fkey foreign KEY (lk_tutor) references tutor (cu_)
+) TABLESPACE pg_default;
+
+create table public.que_reportes_mira (
+  id integer not null,
+  quien_mira integer not null,
+  a_quien integer not null,
+  constraint que_reportes_mira_pkey primary key (id, quien_mira, a_quien),
+  constraint que_reportes_mira_a_quien_fkey foreign KEY (a_quien) references amauta (id),
+  constraint que_reportes_mira_quien_mira_fkey foreign KEY (quien_mira) references amauta (id)
+) TABLESPACE pg_default;
+
+
+FiLiPeNSeS#32
+
+Añade una primera página de login con la imagen logo.jpg centrada en el tercio superior. Abajo añade un selector que permita elegir los nombres de la tabla "quien" y un input para ingresar el #celular (el input de celular debe ocultar los caracteres como password). Abajo un botón para ingresar. 
+Construye el state.py de modo que al presionar el botón "ingresar" compara si coinciden los valores ingresados con los de la tabla "quien", en caso de ser correcto, muestra la página principal
+Crea la página principal con 2 paneles (derecho e izquierdo). El panel derecho debe tener scroll vertical y debe mostrar todos los registros de la tabla "partido" en tarjetas (colocadas una debajo de la otra) la información dentro de cada tarjeta debe ser: bandera pais1,bandera país 2, debajo nombre pais1 "vs." nombre pais2, debajo de cada país el marcador (si es nulo colocar el carácter "--"), en la esquina superior izquierda de cada tarjeta muestra la fecha y en la esquina superior derecha de la tarjeta muestra la hora. El scroll debe desplazarse de tal manera que al la carga de la página se miren los partidos programados para la semana actual (de lunes a domingo). Las tarjetas de los partidos que ya tienen marcador (es decir de fechas anteriores al día actual) deben tener fondo gris, las otras tarjetas (de partidos que todavía no se juegan) deben tener fondo verde muy diluido. Al hacer click sobre un partido que todavía no tiene marcador o todavía no se ha jugado (en base a la fecha y hora actual) en el panel izquierdo se desplegará la información ampliada de la tarjeta y se añade un input para el marcador de cada país.  Debajo debe haber un botón de Guardar que insertaría los valores del marcador en la tabla "pronostico" vinculando "quien" y "partido".  
+
+Divide el panel izquierdo en 2 partes (superior e inferior) todo el contenido actual debe estar en la mitad superior, en la mitad inferior presenta en dos tarjetas, la primera  presenta estadísticas relacionadas o vinculadas al usuario actual:
+Mis pronósticos registrados : número de pronósticos que están vinculados al usuario actual
+Mis pronósticos acertados: número de pronósticos acertados por el usuario actual
+Mis aciertos: lista de pronósticos acertados ( fecha: país1 vs pais2)
+
+En otra tarjeta debajo a continuación presenta este texto:
+Reglas: 
+1.-El premio por partido depende del número de pronósticos registrados.
+2.-Si hay más de un ganador por partido, el premio de ese partido se divide entre los ganadores.
+3.-Si no hay aciertos en un partido, el premio de ese partido se acumula para la final
+
+Añade un navbar en la parte superior de la pagina principal con el título centrado: "Familia Mundialista 2026", a la derecha añade un botón que dice: "Actualizar marcadores" que estará habilitado solamente para los usuario id=1 id=13. Al presionar este botón despliega un diálogo con una lista de tarjetas de los partidos "pasados" o ya jugados que no tengan marcador registrado, en cada tarjeta debe haber 2 input para registrar el marcador de cada país. Cada tarjeta debe incluir un botón de guardar para que se incluya el marcador en el registro de partido correcto. No es obligatorio registrar todos los marcadores pasados, el diálogo debe incluir un botón "Salir"
+
+Modifica la tarjeta del panel derecho (tarjeta por partido) de la siguiente manera:
+1. Mueve la ubicación de la hora del partido para que aparezca debajo de la fecha
+2. Añade el día de la semana (en palabras) a la fecha del partido
+3. Reduce el ancho de la tarjeta  por partido para que a la derecha añadas una nueva tarjeta
+
+A la derecha de cada tarjeta de partido añade una tarjeta de estadística de ese partido con la siguiente informacion:
+a. Numero de pronósticos registrados para ese partido (cuantos usuarios registraron pronostico para ese partido)
+B. Numero y Lista de nombres de usuarios que acertaron el pronóstico del partido
+C. Premio por ganador: Valor de a / b 
+
+La nueva tarjeta de estadísticas de cada partido debe estar en modo lectura siempre.
+
+====
+A la derecha del botón actualizar en la tarjeta fila_partido añade un botón "Mirar todos los pronósticos" que muestre un diálogo en el que se presenten (dentro de una tabla) todos los pronósticos realizados por todos los usuarios (incluido el actual) para ese partido con las columnas: Quien, goles1,goles2. En el título de la tabla debe estar "Quien", nombre pais1, nombre pais2.
+
+Hola a todos. 
+Acabo de actualizar la aplicación web y en teoría ya funciona bien.
+Ya pueden registrar sus pronósticos.
+En el partido Canadá Vs. Bosnia tenemos 4 ganadores:
+Alexandra, Tati, Dome, MaJosé… revisen el cuadro de sus aciertos y premios acumulados…
+
+
+SERVI277017
+
+3058 NW 72 Ave,
+MIAMI, FL 33122
+
+tf:305 777 3558
+
+
+
+Queríamos agradecerles por todo el cariño que tienen para Antonia, de verdad lo apreciamos mucho. La invitación a mirar el partido de Argentina para nosotros no es solamente un gesto de cortesía de su parte, todo el cuidado y los detalles que pusieron para Antonia son muestra de su preocupación por ella, el gesto de Martina de hacer su DNI fue decirle "queremos que seas parte de esta gran familia Argentina". Ayer que nos enteramos que Antonia recibió su residencia lo vivimos como una extension de su gesto de acogida con ella. Les agradecemos de todo corazón por brindarle a Antonia un lugar cálido y seguro.
+
+
+queríamos agradecerles por el cariño que tienen para Antonia, invitarla a mirar el partido con su camiseta y el DNI que hizo Martina fue el detalle "mágico" de bienvenida a Antonia, ayer que nos enteramos que fue aprobada su residencia todo encajó. Gracias por su preocupación por Antonia. Saludos Jaime y Ma.José
+
+Esta reunión es más que un encuentro, es el reflejo de una vida tejida juntos, hebra por hebra desde la infancia. No solo compartimos la mesa hoy, compartimos la trama invisible que nos une. Cada abrazo, cada risa y cada historia que contamos viene del cariño compartido, de la intención por construir un lugar seguro y cálido para todos.
+De manera invisible, detrás de nosotros está el empeño de nuestros padres, el amor que nos teje, la memoria que nos sostiene y la certeza que pase lo que pase siempre tenemos un lugar al que pertenecer.
+Hoy todos los hilos se encuentran aquí, gracias por ser parte de este tejido familiar.
+
+Una vida tejida desde la infancia. Cada uno de ustedes es un hilo de este tapiz multicolor. Gracias por construir juntos estas historias y darle vida a nuestra gran familia.
+
+===
+Revisa la lógica de _editor_formato en config_reportes.py para que los controles (componentes) permanezcan en modo solo lectura o deshabilitados y se habiliten solamente cuando el usuario haga click en "Pencil" para editarlos.
+
+====
+Una atención puede tener vinculados varios medicamentos cada uno con su concentración, presentación, cantidad e indicaciones y para el reporte necesito "rescatarlos o reflejarlos" a cada uno  (con sus propias concentraciones, presentación, cantidad e indicaciones) para mostrarlos por separado. Actualmente el motor de reportes ejecuta un SQL que entiendo que devuelve una lista de los medicamentos prescritos, sin embargo, de esta manera no los puedo representar en el reporte. 
+Mi idea es modificar el motor de modo que en los casos en que la consulta SQL arroje varios elementos, el reporte pueda diferenciarlos a cada uno para ubicarlos en las respectivas celdas y columnas que convenga.  
+Por ejemplo, quisiera poder construir una consulta SQL que devuelva el primer medicamento prescrito (con sus propias concentraciones, presentación, cantidad e indicaciones), luego una segunda consulta SQL me devuelva el segundo medicamento prescrito, una tercera consulta SQL me devuelva el tercer medicamento y así sucesivamente, siempre que exista el segundo, tercero, cuarto elemento. Considerando que cada consulta recupera un elemento único de los posibles que cumplen con estar vinculados a la atención de interés.
+Es posible hacerlo. ? Me he explicado bien, se comprende mi necesidad ?
+
+===
+En el CRUD de la tabla "Formato Celda" añade una tercera función (ícono de pegar-paste) que al ser presionado el ícono despliega un diálogo que tiene un texto con el nombre de "Explicación" seleccionada y debajo un input que diga "formato", en el que el usuario puede pegar un string completo de formato (para clonar rápidamente un formato de celda ya existente). Se debe hacer un control básico del string ingresado, contando el número de caracteres que debe ser 22 para el formato actual (p.ej: 09.12.02.00.NLU.0000.N )
+
+001-001-035204675
+Nº
+
+
+1790041220001
+041-905-000174635
+
+===
+3058 NW 72nd Ave., Miami FL 33122
+
+===
+Necesito que analices el código para ver cuál es la mejor opción antes de implementarla.
+
+El problema actual es que al configurar 5 secciones de medicamentos prescritos en un reporte impreso, el espacio disponible para los "cuidados generales" se reduce demasiado y está muy abajo en la hoja impresa, entonces, pensaba en añadir un análisis al proceso de generación del reporte impreso de prescripción, en el cual, mientras no haya un 5to medicamento prescrito, las ubicaciones de las secciones: "firma del médico" y "cuidados generales al paciente" se ubican en las celdas programadas, pero si existiese un 5to medicamento prescrito, a los elementos de estas 2 secciones se las debe "bajar" 4 filas en el reporte, sin alterar la configuración de la tabla reporte_celda.
+El problema es que me parece una solución poco limpia.
+Que opinas
+
+En atencion.py dentro del panel izquierdo inferior, dentro del tab "Antecedentes Personales" añadir una tabla con la misma estructura de la tabla diagnósticos en la que se muestre los registros de la tabla "diagnóstico" que cumplan que tipo='Ant.Personal'
+
+====
+Modifica el offcanvas_pedido_examenes, de manera que: tengamos 3 columnas de componentes. La primera columna presenta una tabla "Grupos Exámenes" con todos los grupos de examenes disponibles (tabla examentes_laboratorio_grupo), la segunda columna tendrá una input para buscar un examen específico y debajo una tabla (Exámenes disponibles que ahora ya existe, pero habría que eliminar la columna "grupo" dejando solamente el campo "examen") con la lista de todos los exámenes pertenecientes al grupo seleccionado previamente en la tabla "Grupos Exámenes" y un icono "+" que permitirá añadir el examen marcado al registro de pedido de exámenes (tabla examen_laboratorio_pedido) y mostrarlo en la tabla "Examenes Solicitados" de la tercera columna (dejar la tabla exactamente como está ahora).
+
+
+Esta reunión no solo es un encuentro, es el reflejo de una vida tejida juntos, hebra por hebra desde la infancia. No solo compartimos la mesa hoy, compartimos una trama invisible que nos une. Cada abrazo, cada risa y cada historia que recordamos viene del cariño compartido, de la intención por construir un lugar seguro y cálido para todos.
+De manera invisible, detrás de nosotros está el empeño de nuestros padres, el amor que nos teje, la memoria que nos sostiene. Todo contribuye a la certeza que pase lo que pase siempre tenemos un lugar al que pertenecer.
+Hoy todos los hilos se juntan, gracias por ser parte de este tejido familiar.
+
+===
+1)En dialogos.py dentro de offcanvas_menu añade un nuevo componente "Certificados" y dentro de éste, un subcomponente anidado que se despliega "Nuevo Certificado". Al hacer click en "Nuevo Certificado" se debe comprobar que se haya grabado un SOAP para la atención actual, caso contrario, se debe mostrar un diálogo indicando: "Para emitir un certificado debe registrar un SOAP en la atención actual". Si se cumple esta condición, se despliega un diálogo para registrar todos los valores del nuevo certificado. El diálogo debe incluir un botón para "Cancelar" otro para "Grabar Certificado" y otro para "Imprimir Certificado", el cual solo se habilita cuando se haya grabado el certificado. Los campos presenta_sintomas y aislamiento se maneja con check box. El nuevo certificado estará vinculado al SOAP de la atención actual.
+2)Dentro del mismo componente "Certificados" del offcanvas_menu, añade otro subcomponente "Certificado Tardío", que al hacer click despliega un diálogo mostrando una tabla con las atenciones pasadas (dialogo lista atenciones pasadas) del paciente actual con los campos:"atencion.fecha_atencion,atencion.motivo_consulta, CRUD(botón: crear certificado). Al hacer click en el botón "crear certificado" se despliega un nuevo diálogo para registrar los valores necesarios para un certificado, en este caso, el certificado que se crea debe estar vinculado a la atención tardía seleccionada en el dialogo (lista atenciones pasadas).
+3)Dentro del mismo componente "Certificados" del offcanvas_menu, añade otro subcomponente "Todos los Certificados", que al hacer click en él se despliega	un offcanvas_certificados_medicos que aparecerá desde la derecha.
+El offcanvas_certificados_medicos contiene una tabla con los registros de todos los certificados correspondientes al paciente actual, las columnas de la tabla deben ser:
+atencion.fecha_atencion, atencion.motivo_consulta, certificado.contingencia, certificado.observacion, CRUD (icono para editar un certificado), Print (icono para re-imprimir un certificado). 
+Un certificado puede ser editado únicamente en el mismo día que se generó la atención.
+====
+Necesito empezar a preparar un "instalador" para poder instalar la aplicación gesmedweb para cada médico que la requiera. 
+Gesmed debe tener 2 posibles "modos" de instalación: Modo 1: Cuando el médico ya tiene instalado amaymed (versión python de escritorio anterior a gesmedweb), en cuyo caso, debe conservar y migrar la información existente, y debe crear las tablas actualizadas o nuevas que requiera. Hemos construido ya alguno métodos para migrar la información existente.
+Modo 2: Cuando Gesmed se instala como una aplicación nueva "desde cero" para un médico que nunca tuvo instalado amaymed. En este caso se necesita crear la estructura de modelos y además precargar ciertas tablas que contienen información universal útil para gestionar las atenciones médicas, por ejemplo: Tabla Medicamentos, Tabla Exámenes de Laboratorio, Tablas de Configuración de reportes, Tabla diagnósticos CIE10, etc.
+Al momento mis_modelos.py no se ha utilizado para mantener la base de datos.
+
+====
+
+En el tab Otros Examenes (dentro de dialogos.py) vamos a añadir 2 secciones para registrar un listado de exámenes que el médico solicita al paciente, el médico puede añadir varios exámenes (del mismo o diferente tipo) al mismo pedido.
+La primera sección es un formulario donde el médico indicará el tipo y detalle del examen que solicita. El formulario solo se habilitará cuando exista un SOAP válido para la atención actual, caso contrario se debe deshabilitar el formulario y mostrar una advertencia. 
+Los exámenes que el médico solicita primero se registran en listas o diccionarios (en memoria) antes de ser grabados en la base de datos. Se grabarán a la base de datos únicamente cuando el usuario presione el botón "Grabar Pedido" (que explico más abajo).
+La segunda sección muestra una tabla de examenes que el médico va solicitando + un CRUD para que el médico pueda modificar o eliminar los exámenes solicitados.
+En la primera sección (formulario) coloca un selector que muestra la lista de los diagnósticos relacionados a la atención actual (tabla rel_atencion_diagnostico) de modo que el médico pueda seleccionar un solo diagnóstico que se vinculará al pedido de examen actual, a continuación añade un selector para el tipo de examenes (sel_tipo_examen) en base a la tabla examen_tipo, luego, añade otro selector (sel_examen) que se habilitará luego de la primera selección en el que se mostrarán los exámenes que cumplen con el tipo seleccionado en base a la tabla examen_catalogo, a continuación añade un input de texto extenso (de por lo menos 3 líneas) (in_examen_detalle) donde el médico dará detalles del examen que solicita. Finalmente añade un botón "Añadir Examen" que agregará el examen a memoria.
+Todos los examenes añadidos deben presentarse en la tabla de la segunda sección.  Las columnas de la segunda sección deben ser: "Tipo Examen", "Alias Examen", "Detalle Examen", "CRUD"
+Finalmente en la parte superior del Tab añade 2 botones "Imprimir Pedido", "Grabar Pedido"
+El botón grabar pedido se habilitará cuando exista al menos un examen pedido, luego de grabado el pedido se deshabilitará el formulario y la tabla de exámenes (CRUD), el botón pasa a modo "Editar Pedido", si el médico presiona Editar Pedido se habilita nuevamente el formulario y la tabla de exámenes (CRUD).
+El botón imprimir pedido se habilita solamente cuando se ha grabado el pedido actual y genera un reporte impreso con la plantilla "pedido_examen.xlsx".
+
+En el tab Otros Examenes (dentro de dialogos.py) vamos a registrar los exámenes que el médico solicita al paciente, vinculados a la atencion actual y a un diagnósticos relacionado con la atención actual. El médico puede añadir varios exámenes del mismo o diferente tipo en un mismo pedido.
+Para esto, primero debemos verificar que exista un SOAP válido para la atención actual, si existe el SOAP continuamos, caso contrario se muestra una advertencia en la parte superior del TAB. 
+Primero colocar un select para que el médico pueda (deba) vincular el pedido a un diagnósticos de entre los diagnósticos relacionados con esta atencion (tabla rel_atencion_diagnostico). Sin este paso completado no se habilitan los siguientes.
+A continuación necesitamos una tabla (examenes_solicitados) que mostrará el resumen de todos los exámenes que ha solicitado el médico, las columnas de la tabla deben ser: "Tipo Examen", "Alias Examen", "Detalle Examen", "CRUD" . Y sobre la tabla a la derecha ubica un botón que dice "Agregar +".
+Al presionar el botón "Agregar +" se muestra un formulario que contiene un selector para el tipo de examenes (sel_tipo_examen) en base a la tabla examen_tipo, luego, añade otro selector (sel_examen) que se habilitará luego de la primera selección en el que se mostrarán los exámenes que cumplen con el tipo seleccionado en base a la tabla examen_catalogo, a continuación añade un input de texto extenso (de por lo menos 3 líneas) (in_examen_detalle) donde el médico dará detalles del examen que solicita, finalmente añade un botón "Cancelar" y otro "Grabar Pedido". Los pedidos se graban en primera instancia en memoria dentro de variables (listas o diccionarios) antes de subirlos a la Base de Datos.
+Todos los examenes solicitados por el médico aparecen en la tabla "examenes_solicitados" y se podrán modificar (editar, eliminar) con los botones de la columna CRUD.
+En la parte superior del Tab añade 2 botones "Imprimir Pedido", "Grabar Pedido"
+El botón grabar pedido se habilitará cuando exista al menos un examen_solicitado, luego de grabado el pedido se deshabilitará contenido del offcanvas, el botón pasa a modo "Editar Pedido", si el médico presiona Editar Pedido se habilita nuevamente los componentes del offcanvas.
+El botón imprimir pedido se habilita solamente cuando se ha grabado el pedido actual y al presionarse genera un reporte impreso con la plantilla "pedido_examen.xlsx".
+=====
+Hay una confusión en el proceso de grabación de los pedidos de exámenes. 
+Hay un nivel grupal que corresponde a todos los exámenes solicitados para un paciente en la atención actual, y hay un nivel individual que es cada uno de los examenes solicitados. 
+Al grabar un examen en nive individual los controles del tab deben seguir habilitados (al momento se deshabilitan).  Los controles del tab se deshabilitan únicamente cuando se presiona el botón 
+===
+En offcanvas_pedido_examenes mover los botones de la cabecera al interior del tab Examenes Laboratorio, ubicados en la parte superior derecha del tal
+===
+
+Una vida tejida desde la infancia. Cada uno de ustedes es un hilo lleno de color en este tapiz. Gracias por construir juntos estos momentos e historias, gracias por darle vida y textura a nuestra gran familia.
+
+39003362
+39003362
+39003362
+35003691
+35003311
+37003189
+
+INSERT INTO `mes_curso` VALUES (None,14,'Mayo C26-27',1),(None,14,'Junio C26-27',2),(None,14,'Julio C26-27',3),(None,14,'Agosto C26-27',4),(None,14,'Septiembre C26-27',5),(None,14,'Octubre C26-27',6),(None,14,'Noviembre C26-27',7),(None,14,'Diciembre C26-27',8),(None,14,'Enero C26-27',9),(None,14,'Febrero C26-27',10)
+
+
+https://www.myunidays.com/ES/es-ES
+
+
+
+DELETE FROM `acc_alumno` WHERE `acc_alumno`.`id_acc` = 1615
+DELETE FROM `asistencia` WHERE `asistencia`.`id_asistencia` = 3011
+DELETE FROM `seg_personal` WHERE `seg_personal`.`id_seguimiento` = 49
+DELETE FROM `hijo` WHERE `hijo`.`id_hijo` = 841
+UPDATE `matricula` SET `lk_curso` = 'lj761k' WHERE `matricula`.`id_matricula` = 1487;
+UPDATE `acc_alumno` SET `lk_regimen` 
+
+
+rx.cond(
+                                AtencionState.offcanvas_resultados_examenes,
+                                rx.button("📖 Resultados Exam", bg=BOTON_ABIERTO, color="white", font_size="12px",
+                                          border=_B, on_click=AtencionState.cierra_offcanvas_resultados_examenes, cursor="pointer"),
+                                rx.button("📙 Resultados Exam", variant='surface', font_size="12px",
+                                          border=_B, cursor="pointer",
+                                          on_click=[AtencionState.abre_offcanvas_resultados_examenes, ResultadosState.ri_recargar]),
+                            ),

@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(.virtual/bin/python -c ' *)",
+      "Bash(mysql -u med_admin -pgesmed01 gesmed)",
+      "Bash(mysql -u med_admin -pgesmed01 gesmed -e ' *)",
+      "Bash(npm install *)",
+      "Bash(node -e \"require\\('./node_modules/semver'\\)\")",
+      "Bash(python3 -c ' *)",
+      "Bash(.venv/bin/python -c ' *)",
+      "Bash(.virtual/bin/python -c \"from GesmedWeb.paginas.atencion import index; print\\('OK'\\)\")",
+      "Bash(awk 'NR>=484 && NR<=492' /Users/jaime/Software/Reflex/GesmedWeb/GesmedWeb/state.py)",
+      "Bash(awk 'NR==46 || NR==47 || NR==123 || NR==124 || NR==401 || NR==402 || NR==411 || NR==412 || NR==483 || NR==492 || NR==540 || NR==541 || NR==617 || NR==618 || NR==652 || NR==656 || NR==660 || NR==708 || NR==726 || NR==766' /Users/jaime/Software/Reflex/GesmedWeb/GesmedWeb/componentes/componentes.py)",
+      "Bash(awk 'NR>=119 && NR<=145' /Users/jaime/Software/Reflex/GesmedWeb/GesmedWeb/componentes/componentes.py)",
+      "Bash(awk 'NR>=480 && NR<=495' /Users/jaime/Software/Reflex/GesmedWeb/GesmedWeb/componentes/componentes.py)",
+      "Bash(awk 'NR>=395 && NR<=420' /Users/jaime/Software/Reflex/GesmedWeb/GesmedWeb/componentes/componentes.py)",
+      "Bash(awk 'NR>=535 && NR<=545' /Users/jaime/Software/Reflex/GesmedWeb/GesmedWeb/componentes/componentes.py)",
+      "Bash(awk 'NR>=525 && NR<=545' /Users/jaime/Software/Reflex/GesmedWeb/GesmedWeb/componentes/componentes.py)",
+      "Bash(awk 'NR>=610 && NR<=665' /Users/jaime/Software/Reflex/GesmedWeb/GesmedWeb/componentes/componentes.py)",
+      "Bash(awk 'NR>=700 && NR<=770' /Users/jaime/Software/Reflex/GesmedWeb/GesmedWeb/componentes/componentes.py)",
+      "Bash(awk 'NR==255 || NR==258 || NR==260 || NR==291 || NR==294 || NR==295 || NR==308 || NR==310 || NR==386 || NR==389 || NR==390 || NR==392 || NR==460 || NR==463 || NR==466 || NR==468 || NR==519 || NR==521 || NR==525 || NR==527' /Users/jaime/Software/Reflex/GesmedWeb/GesmedWeb/componentes/dialogos.py)",
+      "Bash(awk 'NR>=85 && NR<=102 || NR>=705 && NR<=715 || NR>=798 && NR<=815 || NR>=875 && NR<=895' /Users/jaime/Software/Reflex/GesmedWeb/GesmedWeb/componentes/dialogos.py)",
+      "Bash(awk 'NR>=220 && NR<=242 || NR>=1820 && NR<=1835 || NR>=1865 && NR<=1875' /Users/jaime/Software/Reflex/GesmedWeb/GesmedWeb/componentes/dialogos.py)",
+      "Bash(awk 'NR>=1670 && NR<=1700 || NR>=1735 && NR<=1745 || NR>=1773 && NR<=1780' /Users/jaime/Software/Reflex/GesmedWeb/GesmedWeb/componentes/dialogos.py)",
+      "Bash(awk 'NR>=1920 && NR<=1960' /Users/jaime/Software/Reflex/GesmedWeb/GesmedWeb/componentes/dialogos.py)",
+      "Bash(awk 'NR>=2220 && NR<=2235' /Users/jaime/Software/Reflex/GesmedWeb/GesmedWeb/componentes/dialogos.py)",
+      "Bash(awk 'NR>=180 && NR<=188 || NR>=200 && NR<=210 || NR>=292 && NR<=300 || NR>=312 && NR<=320 || NR>=400 && NR<=420 || NR>=474 && NR<=483 || NR>=516 && NR<=525' /Users/jaime/Software/Reflex/GesmedWeb/GesmedWeb/paginas/atencion.py)",
+      "Bash(awk 'NR>=50 && NR<=60 || NR>=78 && NR<=100' /Users/jaime/Software/Reflex/GesmedWeb/GesmedWeb/paginas/lista_pacientes.py)",
+      "Bash(awk -F: '{print NR\"  \"$0}')",
+      "Bash(awk 'NR>=60 && NR<=73 || NR>=119 && NR<=143 || NR>=205 && NR<=215 || NR>=222 && NR<=230 || NR>=234 && NR<=240 || NR>=1022 && NR<=1028' /Users/jaime/Software/Reflex/GesmedWeb/GesmedWeb/componentes/dialogos.py)",
+      "Bash(python -c \"import fastapi; print\\(fastapi.__version__\\)\")"
+    ]
+  }
+}

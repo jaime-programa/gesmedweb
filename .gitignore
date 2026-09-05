@@ -1,0 +1,25 @@
+.web
+__pycache__/
+.states
+*.py[cod]
+*.db
+assets/external/
+
+# Entorno virtual
+.virtual/
+
+# Secretos y credenciales — nunca versionar
+.env
+.env.*
+.claude/settings.local.json
+
+# Backups y dumps con datos reales de pacientes
+backups/
+sql/gesmed.sql
+
+# Archivos subidos por usuarios (contenido clínico)
+uploaded_files/*
+!uploaded_files/.gitkeep
+
+# macOS
+.DS_Store

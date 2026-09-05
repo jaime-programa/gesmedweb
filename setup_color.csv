@@ -1,0 +1,109 @@
+archivo,linea,color,contexto,componente
+GesmedWeb/state.py,486,#F892F6,Resaltado del término buscado en campos SOAP (ha_soap_html),<mark> HTML tag (inline style string generado en Python)
+GesmedWeb/componentes/dialogos.py,12,gray,Texto de unidad de signo vital — fila inline SV,rx.text (dentro de _fila_sv)
+GesmedWeb/componentes/dialogos.py,41,gray,Texto de unidad de signo vital — fila diálogo SV,rx.text (dentro de _fila_sv_dialog)
+GesmedWeb/componentes/dialogos.py,64,gray (color_scheme),Botón Cancelar en diálogo advertencia salir SOAP,rx.button variant=soft
+GesmedWeb/componentes/dialogos.py,70,red (color_scheme),Botón Salir sin guardar en diálogo advertencia SOAP,rx.button
+GesmedWeb/componentes/dialogos.py,91,gray,Descripción del diálogo Otros Signos Vitales,rx.dialog.description
+GesmedWeb/componentes/dialogos.py,100,gray (color_scheme),Botón Cerrar en diálogo Otros SV,rx.button variant=soft
+GesmedWeb/componentes/dialogos.py,123,white,Texto del botón Vincular Diagnóstico en cabecera SOAP,rx.button
+GesmedWeb/componentes/dialogos.py,140,white,Texto del botón Editar SOAP en cabecera SOAP,rx.button
+GesmedWeb/componentes/dialogos.py,209,gray (color_scheme),Botón Otros SV en sección signos vitales SOAP,rx.button variant=outline
+GesmedWeb/componentes/dialogos.py,226,gray,Texto resumen Otros SV visibles en SOAP (sv_otros_texto),rx.text
+GesmedWeb/componentes/dialogos.py,238,white,Fondo del contenedor scroll de campos SOAP,rx.box (contenedor scroll SOAP)
+GesmedWeb/componentes/dialogos.py,260,rgba(0,0,0,0.2),Overlay oscuro al abrir offcanvas_atencion,rx.box (overlay fijo full-screen)
+GesmedWeb/componentes/dialogos.py,295,black,Color texto en dict de estilos _PX_M para encabezado tabla prescripción,dict _PX_M → rx.table.column_header_cell
+GesmedWeb/componentes/dialogos.py,310,orange (color_scheme),Badge de sustancia de alergia en lista alergias prescripción,rx.badge variant=soft
+GesmedWeb/componentes/dialogos.py,389,grass (color_scheme),Badge nombre del medicamento seleccionado en formulario prescripción,rx.badge variant=solid
+GesmedWeb/componentes/dialogos.py,392,gray (color_scheme),Botón icono deseleccionar medicamento en formulario prescripción,rx.icon_button variant=ghost
+GesmedWeb/componentes/dialogos.py,463,gray (color_scheme),Botón Cancelar en formulario ítem prescripción,rx.button variant=ghost
+GesmedWeb/componentes/dialogos.py,468,green (color_scheme),Botón Añadir ítem a la prescripción,rx.button
+GesmedWeb/componentes/dialogos.py,521,blue (color_scheme),Botón icono editar ítem de prescripción en tabla,rx.icon_button variant=ghost
+GesmedWeb/componentes/dialogos.py,527,red (color_scheme),Botón icono eliminar ítem de prescripción en tabla,rx.icon_button variant=ghost
+GesmedWeb/componentes/dialogos.py,629,white,Texto del botón Grabar Prescripción,rx.button
+GesmedWeb/componentes/dialogos.py,642,white,Texto del botón Guardar Cambios prescripción,rx.button
+GesmedWeb/componentes/dialogos.py,709,gray (color_scheme),Botón ghost en cabecera de prescripción,rx.button variant=ghost
+GesmedWeb/componentes/dialogos.py,746,black,Label Concentración en formulario nuevo ítem prescripción,rx.text
+GesmedWeb/componentes/dialogos.py,760,black,Label Cantidad en formulario nuevo ítem prescripción,rx.text
+GesmedWeb/componentes/dialogos.py,772,black,Label Presentación en formulario nuevo ítem prescripción,rx.text
+GesmedWeb/componentes/dialogos.py,786,black,Label Indicaciones en formulario nuevo ítem prescripción,rx.text
+GesmedWeb/componentes/dialogos.py,801,red (color_scheme),Callout de error en diálogo editar ítem prescripción,rx.callout icon=triangle_alert
+GesmedWeb/componentes/dialogos.py,812,indigo (color_scheme),Botón Guardar cambios en diálogo editar ítem prescripción,rx.button
+GesmedWeb/componentes/dialogos.py,855,black,Label Nombre genérico en diálogo nuevo medicamento,rx.text
+GesmedWeb/componentes/dialogos.py,868,black,Label Nombre comercial en diálogo nuevo medicamento,rx.text
+GesmedWeb/componentes/dialogos.py,881,red (color_scheme),Callout de error en diálogo nuevo medicamento,rx.callout icon=triangle_alert
+GesmedWeb/componentes/dialogos.py,892,green (color_scheme),Botón Añadir medicamento en diálogo nuevo medicamento,rx.button
+GesmedWeb/componentes/dialogos.py,920,rgba(0,0,0,0.2),Overlay oscuro al abrir offcanvas_prescripcion,rx.box (overlay fijo full-screen)
+GesmedWeb/componentes/dialogos.py,967,rgba(0,0,0,0.2),Overlay oscuro al abrir offcanvas_nuevo_diagnostico,rx.box (overlay fijo full-screen)
+GesmedWeb/componentes/dialogos.py,1001,black,Label genérico en función auxiliar _label() — formulario nuevo paciente,rx.text
+GesmedWeb/componentes/dialogos.py,1025,green,Título de sección en función _section_title() — formulario paciente,rx.text
+GesmedWeb/componentes/dialogos.py,1243,indigo (color_scheme),Botón Editar datos paciente en diálogo editar paciente,rx.button
+GesmedWeb/componentes/dialogos.py,1270,black,Label en función _label_ro() — vista lectura datos paciente,rx.text
+GesmedWeb/componentes/dialogos.py,1274,black,Label en función _label_ro() variante — vista lectura datos paciente,rx.text
+GesmedWeb/componentes/dialogos.py,1291,black,Label en función _label_edit() — vista edición datos paciente,rx.text
+GesmedWeb/componentes/dialogos.py,1295,black,Label en función _label_edit() variante — vista edición datos paciente,rx.text
+GesmedWeb/componentes/dialogos.py,1348,black,Label Observaciones no médicas en formulario editar paciente,rx.text
+GesmedWeb/componentes/dialogos.py,1361,red (color_scheme),Callout de error al guardar datos de paciente,rx.callout icon=triangle_alert
+GesmedWeb/componentes/dialogos.py,1365,green (color_scheme),Callout de éxito al guardar datos de paciente,rx.callout icon=circle_check
+GesmedWeb/componentes/dialogos.py,1369,gray (color_scheme),Botón Salir en diálogo editar paciente,rx.button variant=soft
+GesmedWeb/componentes/dialogos.py,1376,indigo (color_scheme),Botón Editar en diálogo editar paciente (modo lectura),rx.button
+GesmedWeb/componentes/dialogos.py,1387,green (color_scheme),Botón Grabar Cambios en diálogo editar paciente (modo edición),rx.button
+GesmedWeb/componentes/dialogos.py,1390,green (color_scheme),Botón Grabar Cambios deshabilitado en diálogo editar paciente,rx.button disabled=True
+GesmedWeb/componentes/dialogos.py,1434,green (color_scheme),Botón Guardar Diagnóstico en diálogo nuevo diagnóstico,rx.button
+GesmedWeb/componentes/dialogos.py,1487,black,Label Buscar Diagnóstico CIE10 en diálogo nuevo diagnóstico,rx.text
+GesmedWeb/componentes/dialogos.py,1534,green (color_scheme),Badge con el código CIE10 seleccionado en diálogo nuevo diagnóstico,rx.badge
+GesmedWeb/componentes/dialogos.py,1551,black,Label Tipo en diálogo nuevo diagnóstico,rx.text
+GesmedWeb/componentes/dialogos.py,1571,black,Label Fecha Diagnóstico en diálogo nuevo diagnóstico,rx.text
+GesmedWeb/componentes/dialogos.py,1587,black,Label Fecha Inicio Aparente en diálogo nuevo diagnóstico,rx.text
+GesmedWeb/componentes/dialogos.py,1607,black,Label Observaciones en diálogo nuevo diagnóstico,rx.text
+GesmedWeb/componentes/dialogos.py,1624,red (color_scheme),Callout de error al guardar diagnóstico,rx.callout
+GesmedWeb/componentes/dialogos.py,1644,green (color_scheme),Botón Guardar Diagnóstico (pie de diálogo),rx.button
+GesmedWeb/componentes/dialogos.py,1680,white,Texto del botón Nuevo Diagnóstico en diálogo vincular,rx.button
+GesmedWeb/componentes/dialogos.py,1692,gray,Descripción instruccional en diálogo vincular diagnóstico,rx.dialog.description
+GesmedWeb/componentes/dialogos.py,1740,red,Callout/texto de error en diálogo vincular diagnóstico,rx.callout variant=soft
+GesmedWeb/componentes/dialogos.py,1747,gray (color_scheme),Botón Cancelar en diálogo vincular diagnóstico,rx.button variant=soft
+GesmedWeb/componentes/dialogos.py,1752,blue (color_scheme),Botón Confirmar Vínculos en diálogo vincular diagnóstico,rx.button
+GesmedWeb/componentes/dialogos.py,1777,green,Ícono de confirmación de vínculos guardados,rx.icon name=circle_check
+GesmedWeb/componentes/dialogos.py,1790,green (color_scheme),Botón Listo en diálogo confirmación de vínculos OK,rx.button
+GesmedWeb/componentes/dialogos.py,1826,#025BFF,Color del botón + para agregar examen al pedido,rx.button variant=ghost (en _fila_examen_disponible)
+GesmedWeb/componentes/dialogos.py,1871,rgba(220,38,38,0.06),Hover de fila de examen seleccionado en tabla derecha pedido,rx.table.row _hover (en _fila_examen_seleccionado)
+GesmedWeb/componentes/dialogos.py,1890,rgba(0,0,0,0.2),Overlay oscuro al abrir offcanvas_pedido_examenes,rx.box (overlay fijo full-screen)
+GesmedWeb/componentes/dialogos.py,1926,#06B6D4,Fondo del botón Imprimir Pedido (cyan) en cabecera pedido examenes,rx.button
+GesmedWeb/componentes/dialogos.py,1927,white,Texto del botón Imprimir Pedido,rx.button
+GesmedWeb/componentes/dialogos.py,1943,white,Texto del botón Editar Pedido,rx.button
+GesmedWeb/componentes/dialogos.py,1956,white,Texto del botón Guardar Cambios / Grabar Pedido,rx.button
+GesmedWeb/componentes/dialogos.py,2196,rgba(0,0,0,0.2),Overlay oscuro al abrir offcanvas_resultados_examenes,rx.box (overlay fijo full-screen)
+GesmedWeb/componentes/dialogos.py,2227,gray,Texto placeholder de offcanvas resultados exámenes (en construcción),rx.text
+GesmedWeb/componentes/componentes.py,46,black,Texto del motivo_consulta en encabezado del acordeón historial,rx.text (en rx.accordion.item header)
+GesmedWeb/componentes/componentes.py,47,grey,Texto del objetivo en contenido del acordeón historial,rx.text (en rx.accordion.item content)
+GesmedWeb/componentes/componentes.py,123,cyan (color_scheme),Botón Nuevo para abrir diálogo nuevo diagnóstico en tabla diagnósticos,rx.button
+GesmedWeb/componentes/componentes.py,401,blue,Color de pestaña A. Familiares en tabs antecedentes,rx.tabs.trigger (style dict)
+GesmedWeb/componentes/componentes.py,411,green,Color de pestaña A. Personales en tabs antecedentes,rx.tabs.trigger (style dict)
+GesmedWeb/componentes/componentes.py,483,red (color_scheme),Badge de advertencia alergia en prescripción campo solo lectura,rx.badge variant=soft
+GesmedWeb/componentes/componentes.py,492,black,Color texto del badge-label en campo SOAP solo lectura (_soap_campo_ro),rx.badge variant=solid
+GesmedWeb/componentes/componentes.py,520,grass (color_scheme),Badge cantidad de ítem prescripción en vista solo lectura,rx.badge variant=soft
+GesmedWeb/componentes/componentes.py,540,#016b3bae,Border color de la tarjeta de ítem prescripción en vista solo lectura,rx.box (card item prescripción)
+GesmedWeb/componentes/componentes.py,541,#FFFFFF,Fondo de la tarjeta de ítem prescripción en vista solo lectura,rx.box (card item prescripción)
+GesmedWeb/componentes/componentes.py,617,gray (color_scheme),Badge hace X tiempo en cabecera historia (_historia_header),rx.badge variant=soft
+GesmedWeb/componentes/componentes.py,652,red,Color pestaña SOAP en tabs panel historia atencion,rx.tabs.trigger (style dict)
+GesmedWeb/componentes/componentes.py,656,green,Color pestaña Prescripción en tabs panel historia atencion,rx.tabs.trigger (style dict)
+GesmedWeb/componentes/componentes.py,660,blue,Color pestaña Pedidos en tabs panel historia atencion,rx.tabs.trigger (style dict)
+GesmedWeb/componentes/componentes.py,664,orange,Color pestaña Resultados en tabs panel historia atencion,rx.tabs.trigger (style dict)
+GesmedWeb/componentes/componentes.py,708,white,Fondo del panel fijo de historia de atención (con contenido),rx.box position=fixed
+GesmedWeb/componentes/componentes.py,726,white,Fondo del panel fijo de historia de atención (sin selección),rx.box position=fixed
+GesmedWeb/componentes/componentes.py,766,white,Fondo del panel fijo en panel historial prescripciones,rx.box position=fixed
+GesmedWeb/paginas/atencion.py,183,rgb(240,240,240),Fondo del panel sidebar lateral,rx.box position=fixed
+GesmedWeb/paginas/atencion.py,205,white,Fondo del panel detalle de atención (panel derecho),rx.box position=fixed
+GesmedWeb/paginas/atencion.py,296,#ddd,Borde del input de búsqueda busca_historial,rx.input id=busca_historial
+GesmedWeb/paginas/atencion.py,316,#888,Color del texto (placeholder style) del input busca_historial,rx.input id=busca_historial
+GesmedWeb/paginas/atencion.py,406,blue,Color de pestaña A. Familiares en tabs antecedentes (duplicado en página),rx.tabs.trigger (style dict)
+GesmedWeb/paginas/atencion.py,416,green,Color de pestaña A. Personales en tabs antecedentes (duplicado en página),rx.tabs.trigger (style dict)
+GesmedWeb/paginas/atencion.py,477,white,Fondo de la barra inferior fija con nombre médico,rx.box position=fixed bottom=0
+GesmedWeb/paginas/atencion.py,480,black,Texto del nombre del médico en barra inferior fija,rx.text
+GesmedWeb/paginas/atencion.py,520,blue,Enlace Vuelva a Ingresar en caja de sesión caducada,rx.link
+GesmedWeb/paginas/lista_pacientes.py,54,red,Fondo del botón Cerrar Sesión en menú usuario,rx.button
+GesmedWeb/paginas/lista_pacientes.py,55,white,Texto del botón Cerrar Sesión,rx.button
+GesmedWeb/paginas/lista_pacientes.py,81,gray,Texto del nombre del médico en pie del menú usuario,rx.text
+GesmedWeb/paginas/lista_pacientes.py,88,#f8fafc,Fondo del área footer del menú usuario (contiene logout),rx.box
+GesmedWeb/paginas/lista_pacientes.py,95,blue,Enlace Vuelva a Ingresar en caja de sesión caducada,rx.link
+GesmedWeb/paginas/lista_pacientes.py,99,#FAECA2,Fondo de la caja de aviso sesión caducada,rx.box

@@ -1,0 +1,4 @@
+ALTER TABLE examenes_laboratorio_catalogo
+    ADD COLUMN unidad  VARCHAR(15)     NULL DEFAULT NULL,
+    ADD COLUMN minimo  DECIMAL(6, 2)   NULL DEFAULT NULL,
+    ADD COLUMN maximo  DECIMAL(6, 2)   NULL DEFAULT NULL;

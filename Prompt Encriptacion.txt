@@ -1,0 +1,219 @@
+Voy a implementar encriptación AES-256-GCM en campos sensibles de esta aplicación:
+
+## Stack técnico
+- Frontend/Backend: Reflex (Python)
+- Base de datos: MariaDB local
+- IDE: Visual Studio Code
+
+## Fase actual
+- Desarrollo para médicos individuales (no multi-usuario aún)
+- Existe una aplicación anterior llamada "amaymed" (Python escritorio + 
+  MariaDB) cuyos datos deben migrarse a gesmed
+
+## Tablas y campos a encriptar
+
+### paciente
+- `nombre_completo`  → AES-256-GCM, cambiar a BLOB
+- `cedula_id`        → AES-256-GCM, cambiar a BLOB
+- `nro_hclinica`     → NO encriptar (es FK de muchas tablas)
+
+### diagnostico
+- `observaciones`    → AES-256-GCM, cambiar a BLOB
+
+### prescripcion
+- `concentracion`    → AES-256-GCM, cambiar a BLOB
+- `indicaciones`     → AES-256-GCM, cambiar a BLOB
+
+### Tablas futuras (examenes, vacunas, otras)
+- El módulo crypto debe ser extensible sin modificar arquitectura base
+- Documentar cómo agregar encriptación a nuevas tablas
+
+## Decisiones de diseño ya tomadas
+
+### Clave maestra
+- Variable de entorno: GESMED_MASTER_KEY (32 bytes)
+- Implementar como singleton preparado para migración futura 
+  a clave por médico sin cambiar el resto del código:
+
+class GesmedCrypto:
+    @classmethod
+    def para_medico(cls, medico_id: int) -> "GesmedCrypto":
+        # Hoy: usa GESMED_MASTER_KEY para todos
+        # Futuro: clave específica por medico_id
+        ...
+    def encriptar(self, dato: str) -> bytes: ...
+    def desencriptar(self, dato_cifrado: bytes) -> str: ...
+    def buscar_en_bloque(self, registros: list, texto: str) -> list: ...
+
+### Búsqueda por nombre (tabla paciente)
+- Pantalla principal busca pacientes escribiendo mínimo 3 letras
+- Estrategia: bloques de 300 registros, desencriptar en RAM, 
+  filtrar, devolver resultados, descartar inmediatamente
+- NUNCA guardar nombre en claro en BD, logs ni archivos temporales
+- Activar búsqueda solo con mínimo 3 caracteres
+
+### No hay búsquedas por campos encriptados en otras tablas
+- diagnostico y prescripcion se acceden siempre por FK (lk_paciente)
+- No se necesita estrategia de búsqueda especial para esas tablas
+
+## Pipeline de migración (desarrollo, tabla por tabla)
+Crear migrations/migrador_base.py con clase reutilizable:
+
+class MigradorTabla:
+    def mapeo_campos(self) -> dict:
+        # {"campo_amaymed": "campo_gesmed"}
+    def campos_a_encriptar(self) -> list:
+        # campos que se encriptan durante la migración
+    def transformar_registro(self, registro: dict) -> dict:
+        # lógica custom por tabla (campos nuevos, transformaciones)
+    def migrar(self, limite: int = None, offset: int = 0): ...
+    def verificar_migracion(self): ...
+
+Implementar migradores concretos para las 3 tablas:
+- migrations/migrador_paciente.py
+- migrations/migrador_diagnostico.py
+- migrations/migrador_prescripcion.py
+
+Notas sobre la migración desde amaymed:
+- amaymed usa MariaDB (misma BD, diferente esquema)
+- Algunos campos cambian de nombre entre amaymed y gesmed
+- Algunas tablas de gesmed tienen campos nuevos que amaymed no tiene
+- Los campos sensibles se encriptan DURANTE la migración
+- SIEMPRE hacer mysqldump automático antes de migrar
+
+## Orquestador de migración masiva (para producción)
+Crear migrations/orquestador.py para migración completa de un médico:
+
+class OrquestadorMigracion:
+    def ejecutar_migracion_completa(self, medico_id: int):
+        # 1. Backup automático de amaymed (mysqldump)
+        # 2. Ejecutar todos los migradores en orden correcto
+        #    respetando dependencias FK:
+        #    paciente → diagnostico → prescripcion → (futuras)
+        # 3. Verificación integral de todos los conteos
+        # 4. Rollback automático si cualquier tabla falla
+        # 5. Reporte final: registros migrados por tabla,
+        #    errores encontrados, tiempo total
+        ...
+
+## Contexto arquitectural futuro (diseñar hoy, implementar después)
+- Multi-médico en red local
+- Acceso remoto vía VPN (nunca BD expuesta a internet)
+- Interconsultas: un paciente compartido explícitamente entre médicos
+- Migración futura de clave global a clave por médico_id
+
+## Restricciones importantes
+- NUNCA exponer datos sensibles en logs, archivos temporales 
+  ni columnas auxiliares en claro
+- SIEMPRE backup automático antes de cualquier migración
+- Código de hoy no debe obstaculizar migración futura a clave por médico
+- Módulo crypto extensible a nuevas tablas sin cambiar arquitectura
+- Mínimo 3 caracteres para activar búsqueda en memoria
+
+## Esquemas actuales de las tablas en gesmed
+
+### diagnostico
+CREATE TABLE diagnostico (
+  id_diagnostico       int(11) NOT NULL AUTO_INCREMENT,
+  lk_paciente          int(11) NOT NULL,
+  lk_cie10             varchar(11) NOT NULL,
+  tipo                 varchar(14) NOT NULL,
+  fecha_diagnostico    date NOT NULL,
+  fecha_inicio_aparente date NOT NULL,
+  lk_medico            int(11) NOT NULL,
+  observaciones        mediumtext DEFAULT NULL,
+  noduplicados         varchar(22) DEFAULT NULL,
+  PRIMARY KEY (id_diagnostico)
+);
+
+### prescripcion
+CREATE TABLE prescripcion (
+  id_prescripcion     int(11) NOT NULL AUTO_INCREMENT,
+  lk_paciente         int(11) NOT NULL,
+  lk_atencion         int(11) NOT NULL,
+  fecha_prescripcion  date NOT NULL,
+  concentracion       varchar(30) NOT NULL,
+  cantidad            int(2) NOT NULL,
+  lk_presentacion     int(11) NOT NULL,
+  indicaciones        text NOT NULL,
+  lk_generico         int(11) NOT NULL,
+  PRIMARY KEY (id_prescripcion)
+);
+
+### cie10 (catálogo público, NO se encripta)
+CREATE TABLE cie10 (
+  cod_cie10      varchar(11) NOT NULL,
+  grupo          varchar(120) NOT NULL,
+  categoria      varchar(120) NOT NULL,
+  nomdiagnostico varchar(254) NOT NULL,
+  PRIMARY KEY (cod_cie10)
+);
+
+## Entregables solicitados en orden
+1. Revisar estructura actual del proyecto gesmed
+2. crypto/gesmed_crypto.py — módulo de encriptación
+3. Scripts SQL — modificar columnas en las 3 tablas
+4. migrations/migrador_base.py — clase base reutilizable
+5. migrations/migrador_paciente.py
+6. migrations/migrador_diagnostico.py
+7. migrations/migrador_prescripcion.py
+8. migrations/orquestador.py — migración masiva a producción
+9. Indicar qué archivos Reflex existentes necesitan modificarse
+   para integrar encriptación en lecturas y escrituras de 
+   las 3 tablas
+
+## Antes de escribir cualquier código
+1. Revisar la estructura completa del proyecto gesmed
+2. Solicitar el esquema actual de la tabla paciente en gesmed
+3. Solicitar los esquemas equivalentes en amaymed para las 3 tablas
+4. Confirmar versión de Python y dependencias instaladas
+5. Confirmar si existe algún ORM (SQLAlchemy u otro) o se usa 
+   SQL directo en gesmed
+
+=====
+## Instrucción importante de flujo
+Entrega ÚNICAMENTE el punto 1 y el punto 2 (crypto/gesmed_crypto.py)
+y detente. Espera mi confirmación explícita antes de continuar 
+con los puntos 3 al 9.
+
+
+======
+Antes de continuar, crea y ejecuta un script de prueba 
+test_crypto.py que verifique:
+
+1. Que encriptar y desencriptar devuelve el dato original
+2. Que dos encriptaciones del mismo dato producen bytes diferentes 
+   (IV aleatorio funcionando)
+3. Que un dato alterado lanza excepción al desencriptar 
+   (GCM detecta manipulación)
+4. Que datos None o vacíos se manejan sin errores
+5. Que la clave viene de GESMED_MASTER_KEY y falla 
+   explícitamente si no está definida
+6. Que buscar_en_bloque encuentra coincidencias parciales 
+   y no retiene datos en memoria después
+
+Muéstrame la salida de cada prueba con PASSED o FAILED.
+
+=================
+cd /Users/jaime/Software/Reflex/GesmedWeb
+
+# 1. Cambiar las 4 columnas nuevas a BLOB
+mysql --host=localhost --port=3306 --user=med_admin --password=gesmed01 gesmed \
+  < sql/004_paciente_campos_extra_encrypt.sql
+
+# 2. (Si aún no corriste los 3 scripts anteriores, córrelos primero)
+# mysql ... < sql/001_paciente_encrypt.sql
+# mysql ... < sql/002_diagnostico_encrypt.sql
+# mysql ... < sql/003_prescripcion_encrypt.sql
+
+# 3. Encriptar todos los datos plaintext en una sola pasada
+.virtual/bin/python -m migrations.encrypt_existing_data
+
+
+#================
+Cómo saber qué módulos utiliza mi aplicación y debo importar a requirements.txt:
+# Dentro de la carpeta amaymed, busca todos los imports
+grep -rh "^import\|^from" --include="*.py" . | sort | uniq
+
+
+
