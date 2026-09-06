@@ -79,34 +79,6 @@ CREATE TABLE `atencion` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Temporary table structure for view `atencion_amaymed`
---
-
-DROP TABLE IF EXISTS `atencion_amaymed`;
-/*!50001 DROP VIEW IF EXISTS `atencion_amaymed`*/;
-SET @saved_cs_client     = @@character_set_client;
-SET character_set_client = utf8;
-/*!50001 CREATE TABLE `atencion_amaymed` (
-  `id_atencion` tinyint NOT NULL,
-  `clave` tinyint NOT NULL
-) ENGINE=MyISAM */;
-SET character_set_client = @saved_cs_client;
-
---
--- Temporary table structure for view `atencion_amaymed_gesmed`
---
-
-DROP TABLE IF EXISTS `atencion_amaymed_gesmed`;
-/*!50001 DROP VIEW IF EXISTS `atencion_amaymed_gesmed`*/;
-SET @saved_cs_client     = @@character_set_client;
-SET character_set_client = utf8;
-/*!50001 CREATE TABLE `atencion_amaymed_gesmed` (
-  `id_atencion_amaymed` tinyint NOT NULL,
-  `id_atencion_gesmed` tinyint NOT NULL
-) ENGINE=MyISAM */;
-SET character_set_client = @saved_cs_client;
-
---
 -- Temporary table structure for view `atencion_gesmed`
 --
 
@@ -239,34 +211,6 @@ CREATE TABLE `diagnostico` (
   CONSTRAINT `diagnostico_ibfk_3` FOREIGN KEY (`lk_medico`) REFERENCES `points` (`id_medico`) ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=2116 DEFAULT CHARSET=utf8 COLLATE=utf8_spanish2_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Temporary table structure for view `diagnostico_amaymed`
---
-
-DROP TABLE IF EXISTS `diagnostico_amaymed`;
-/*!50001 DROP VIEW IF EXISTS `diagnostico_amaymed`*/;
-SET @saved_cs_client     = @@character_set_client;
-SET character_set_client = utf8;
-/*!50001 CREATE TABLE `diagnostico_amaymed` (
-  `id_diagnostico` tinyint NOT NULL,
-  `noduplicados` tinyint NOT NULL
-) ENGINE=MyISAM */;
-SET character_set_client = @saved_cs_client;
-
---
--- Temporary table structure for view `diagnostico_amaymed_gesmed`
---
-
-DROP TABLE IF EXISTS `diagnostico_amaymed_gesmed`;
-/*!50001 DROP VIEW IF EXISTS `diagnostico_amaymed_gesmed`*/;
-SET @saved_cs_client     = @@character_set_client;
-SET character_set_client = utf8;
-/*!50001 CREATE TABLE `diagnostico_amaymed_gesmed` (
-  `id_diagnostico_amaymed` tinyint NOT NULL,
-  `id_diagnostico_gesmed` tinyint NOT NULL
-) ENGINE=MyISAM */;
-SET character_set_client = @saved_cs_client;
 
 --
 -- Table structure for table `examen_catalogo`
@@ -894,44 +838,6 @@ CREATE TABLE `tipo_cita` (
 --
 
 --
--- Final view structure for view `atencion_amaymed`
---
-
-/*!50001 DROP TABLE IF EXISTS `atencion_amaymed`*/;
-/*!50001 DROP VIEW IF EXISTS `atencion_amaymed`*/;
-/*!50001 SET @saved_cs_client          = @@character_set_client */;
-/*!50001 SET @saved_cs_results         = @@character_set_results */;
-/*!50001 SET @saved_col_connection     = @@collation_connection */;
-/*!50001 SET character_set_client      = utf8mb4 */;
-/*!50001 SET character_set_results     = utf8mb4 */;
-/*!50001 SET collation_connection      = utf8mb4_general_ci */;
-/*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50013 DEFINER=`med_admin`@`localhost` SQL SECURITY DEFINER */
-/*!50001 VIEW `atencion_amaymed` AS select `a`.`id_atencion` AS `id_atencion`,concat(substr(`a`.`motivo_consulta`,1,9),substr(`a`.`subjetivo`,1,9),substr(`a`.`objetivo`,1,9),substr(`a`.`analisis`,1,9),substr(`a`.`plan`,1,9)) AS `clave` from `amaymed`.`atencion` `a` */;
-/*!50001 SET character_set_client      = @saved_cs_client */;
-/*!50001 SET character_set_results     = @saved_cs_results */;
-/*!50001 SET collation_connection      = @saved_col_connection */;
-
---
--- Final view structure for view `atencion_amaymed_gesmed`
---
-
-/*!50001 DROP TABLE IF EXISTS `atencion_amaymed_gesmed`*/;
-/*!50001 DROP VIEW IF EXISTS `atencion_amaymed_gesmed`*/;
-/*!50001 SET @saved_cs_client          = @@character_set_client */;
-/*!50001 SET @saved_cs_results         = @@character_set_results */;
-/*!50001 SET @saved_col_connection     = @@collation_connection */;
-/*!50001 SET character_set_client      = utf8mb4 */;
-/*!50001 SET character_set_results     = utf8mb4 */;
-/*!50001 SET collation_connection      = utf8mb4_general_ci */;
-/*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50013 DEFINER=`med_admin`@`localhost` SQL SECURITY DEFINER */
-/*!50001 VIEW `atencion_amaymed_gesmed` AS select `amed`.`id_atencion` AS `id_atencion_amaymed`,`gmed`.`id_atencion` AS `id_atencion_gesmed` from (`gesmed`.`atencion_amaymed` `amed` join `gesmed`.`atencion_gesmed` `gmed`) where `amed`.`clave` = `gmed`.`clave` */;
-/*!50001 SET character_set_client      = @saved_cs_client */;
-/*!50001 SET character_set_results     = @saved_cs_results */;
-/*!50001 SET collation_connection      = @saved_col_connection */;
-
---
 -- Final view structure for view `atencion_gesmed`
 --
 
@@ -946,44 +852,6 @@ CREATE TABLE `tipo_cita` (
 /*!50001 CREATE ALGORITHM=UNDEFINED */
 /*!50013 DEFINER=`med_admin`@`localhost` SQL SECURITY DEFINER */
 /*!50001 VIEW `atencion_gesmed` AS select `a`.`id_atencion` AS `id_atencion`,concat(substr(`a`.`motivo_consulta`,1,9),substr(`a`.`subjetivo`,1,9),substr(`a`.`objetivo`,1,9),substr(`a`.`analisis`,1,9),substr(`a`.`plan`,1,9)) AS `clave` from `atencion` `a` */;
-/*!50001 SET character_set_client      = @saved_cs_client */;
-/*!50001 SET character_set_results     = @saved_cs_results */;
-/*!50001 SET collation_connection      = @saved_col_connection */;
-
---
--- Final view structure for view `diagnostico_amaymed`
---
-
-/*!50001 DROP TABLE IF EXISTS `diagnostico_amaymed`*/;
-/*!50001 DROP VIEW IF EXISTS `diagnostico_amaymed`*/;
-/*!50001 SET @saved_cs_client          = @@character_set_client */;
-/*!50001 SET @saved_cs_results         = @@character_set_results */;
-/*!50001 SET @saved_col_connection     = @@collation_connection */;
-/*!50001 SET character_set_client      = utf8mb4 */;
-/*!50001 SET character_set_results     = utf8mb4 */;
-/*!50001 SET collation_connection      = utf8mb4_general_ci */;
-/*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50013 DEFINER=`med_admin`@`localhost` SQL SECURITY DEFINER */
-/*!50001 VIEW `diagnostico_amaymed` AS select `ad`.`id_diagnostico` AS `id_diagnostico`,concat(`ad`.`cod_cie10`,'.',`ad`.`cod_cie10`,'.',lpad(`pg`.`nro_hclinica`,8,'0')) AS `noduplicados` from (`amaymed`.`diagnostico` `ad` join `gesmed`.`paciente_pk` `pg`) where `ad`.`nombre_paciente` = `pg`.`nombre_completo` */;
-/*!50001 SET character_set_client      = @saved_cs_client */;
-/*!50001 SET character_set_results     = @saved_cs_results */;
-/*!50001 SET collation_connection      = @saved_col_connection */;
-
---
--- Final view structure for view `diagnostico_amaymed_gesmed`
---
-
-/*!50001 DROP TABLE IF EXISTS `diagnostico_amaymed_gesmed`*/;
-/*!50001 DROP VIEW IF EXISTS `diagnostico_amaymed_gesmed`*/;
-/*!50001 SET @saved_cs_client          = @@character_set_client */;
-/*!50001 SET @saved_cs_results         = @@character_set_results */;
-/*!50001 SET @saved_col_connection     = @@collation_connection */;
-/*!50001 SET character_set_client      = utf8mb4 */;
-/*!50001 SET character_set_results     = utf8mb4 */;
-/*!50001 SET collation_connection      = utf8mb4_general_ci */;
-/*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50013 DEFINER=`med_admin`@`localhost` SQL SECURITY DEFINER */
-/*!50001 VIEW `diagnostico_amaymed_gesmed` AS select `ad`.`id_diagnostico` AS `id_diagnostico_amaymed`,`gd`.`id_diagnostico` AS `id_diagnostico_gesmed` from (`gesmed`.`diagnostico_amaymed` `ad` join `gesmed`.`diagnostico` `gd`) where `ad`.`noduplicados` = `gd`.`noduplicados` */;
 /*!50001 SET character_set_client      = @saved_cs_client */;
 /*!50001 SET character_set_results     = @saved_cs_results */;
 /*!50001 SET collation_connection      = @saved_col_connection */;
@@ -1016,4 +884,4 @@ CREATE TABLE `tipo_cita` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-06 17:59:22
+-- Dump completed on 2026-09-06 18:06:49
