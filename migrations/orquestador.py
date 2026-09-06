@@ -26,6 +26,9 @@ _ROOT = Path(__file__).parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
+from dotenv import load_dotenv
+load_dotenv(_ROOT / ".env")
+
 from migrations.migrador_paciente                  import MigradorPaciente
 from migrations.migrador_diagnostico               import MigradorDiagnostico
 from migrations.migrador_atencion                  import MigradorAtencion

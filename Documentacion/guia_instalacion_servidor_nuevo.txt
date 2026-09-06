@@ -79,6 +79,17 @@ Crear el archivo .env en la raíz del proyecto:
     GESMED_MASTER_KEY=<el hex generado arriba>
     GESMED_DB_URL=mysql+pymysql://med_admin:<password>@localhost:3306/gesmed
 
+    # Variables sueltas, además de GESMED_DB_URL: migrations/parametros_fijos.py
+    # y migrations/orquestador.py NO leen GESMED_DB_URL — arman los comandos
+    # mysqldump/mysql con estas variables por separado. Si se omiten, caen a
+    # valores por defecto (med_admin/gesmed01) que probablemente NO coincidan
+    # con la contraseña real del servidor nuevo, y fallan con "Access denied".
+    GESMED_DB_HOST=localhost
+    GESMED_DB_PORT=3306
+    GESMED_DB_USER=med_admin
+    GESMED_DB_PASSWORD=<la misma password de arriba>
+    GESMED_DB_NAME=gesmed
+
 (GEODATA_DB_URL ya no es necesaria — se puede omitir del .env.)
 
 CRÍTICO: si este servidor va a recibir datos migrados desde amaymed

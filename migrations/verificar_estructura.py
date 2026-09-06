@@ -24,6 +24,9 @@ _ROOT = Path(__file__).parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
+from dotenv import load_dotenv
+load_dotenv(_ROOT / ".env")
+
 from sqlalchemy import create_engine, inspect
 
 from GesmedWeb.modelos.mis_modelos import SQLModel
