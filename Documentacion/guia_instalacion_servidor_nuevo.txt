@@ -210,16 +210,30 @@ nuevo debe quedar con los datos clínicos migrados desde amaymed
     ilegibles/corruptos tras la migración.
 
 8.2 Restituir (o dejar accesible) la base amaymed de origen en el
-    servidor nuevo, y agregar sus credenciales al .env:
+    servidor nuevo, y agregar sus credenciales al .env. Hacen falta DOS
+    formatos, porque el código los usa para cosas distintas — no basta
+    con poner uno solo:
 
+    AMAYMED_DB_URL=mysql+pymysql://med_admin:<password>@localhost:3306/amaymed
     AMAYMED_DB_HOST=localhost
     AMAYMED_DB_PORT=3306
     AMAYMED_DB_USER=med_admin
     AMAYMED_DB_PASSWORD=<password>
     AMAYMED_DB_NAME=amaymed
 
-    (Estas variables tienen fallback a los valores por defecto vistos en
-    migrations/orquestador.py, pero es mejor declararlas explícitamente.)
+    - AMAYMED_DB_URL la usan migrations/migrador_base.py y
+      migrations/migrador_medicos.py (todas las conexiones SQLAlchemy a
+      amaymed) — si falta, caen a un default con password "gesmed01"
+      que casi seguro NO es el tuyo, y falla con "Access denied for
+      user 'med_admin'@'localhost'".
+    - AMAYMED_DB_HOST/PORT/USER/PASSWORD/NAME los usa solo
+      migrations/orquestador.py para armar el comando mysqldump del
+      backup automático (no puede reutilizar la URL directamente ahí).
+
+    Ambos apuntan a las mismas credenciales — no hace falta que
+    coincidan literalmente en formato, pero sí en host/usuario/
+    password/base. Todas tienen fallback a defaults si no se declaran,
+    pero declararlas explícitamente evita este error.
 
 8.3 Migrar primero las cuentas de los médicos (amaymed.medico → gesmed.
     points). Esto es obligatorio ANTES del orquestador: si amaymed tiene
@@ -300,6 +314,18 @@ nuevo debe quedar con los datos clínicos migrados desde amaymed
 ------------------------------------------------------------------------
 reflex init      # primera vez: descarga bun, instala deps del frontend
 reflex run --env prod
+
+Nota sobre componente de calendario: .web/ está en .gitignore (es el
+build generado por Reflex), pero el calendario usa un componente JSX
+escrito a mano (.web/calendario_medico.jsx) que por eso nunca viajaba
+con git clone — causaba "Could not load calendario_medico ... No such
+file or directory" al hacer build en un servidor nuevo. Ya se resolvió:
+rxconfig.py ahora copia automáticamente GesmedWeb/custom_components/
+*.jsx hacia .web/ cada vez que se corre cualquier comando reflex (init,
+run, export), siempre que .web/ ya exista. No requiere ningún paso
+manual adicional, pero si en el futuro se agrega otro componente JSX
+escrito a mano, debe guardarse en GesmedWeb/custom_components/ (no
+solo en .web/) para que sobreviva un clon nuevo del repo.
 
 Para producción real (proceso persistente + reverse proxy), lo habitual
 es agregar sobre esto:

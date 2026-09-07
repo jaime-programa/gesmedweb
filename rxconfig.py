@@ -95,6 +95,34 @@ _patch_reflex_dispatch_guard()
 _patch_reflex_color_mode()
 
 
+def _instalar_componentes_custom():
+    """
+    Copia los componentes JSX escritos a mano hacia .web/, ya que .web/
+    completo está en .gitignore (es el build de Reflex) y por eso estos
+    archivos nunca llegan al servidor con git clone.
+
+    Sin esto, "reflex export"/"reflex run" falla en el servidor con
+    "Could not load calendario_medico ... No such file or directory",
+    porque GesmedWeb/componentes/calendario_fc.py referencia
+    library = "$/calendario_medico" (o sea .web/calendario_medico.jsx)
+    y ese archivo solo existía en la máquina donde se escribió a mano.
+    """
+    try:
+        origen_dir = pathlib.Path(__file__).parent / "GesmedWeb" / "custom_components"
+        web_dir = pathlib.Path(__file__).parent / ".web"
+        if not web_dir.exists() or not origen_dir.exists():
+            return
+        for origen in origen_dir.glob("*.jsx"):
+            destino = web_dir / origen.name
+            if not destino.exists() or destino.read_text() != origen.read_text():
+                destino.write_text(origen.read_text())
+    except Exception:
+        pass
+
+
+_instalar_componentes_custom()
+
+
 def _precargar_ocr():
     """Precarga PaddleOCR al arranque para que el primer médico no espere."""
     try:

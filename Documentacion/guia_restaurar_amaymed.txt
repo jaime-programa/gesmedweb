@@ -125,13 +125,26 @@ amaymed — estos son solo ejemplos habituales).
 ------------------------------------------------------------------------
 6. AGREGAR LAS CREDENCIALES DE AMAYMED AL .env
 ------------------------------------------------------------------------
-En /opt/gesmedweb/.env, agregar (si no estaban ya):
+En /opt/gesmedweb/.env, agregar (si no estaban ya) — hacen falta DOS
+formatos, el código los usa para cosas distintas:
 
+    AMAYMED_DB_URL=mysql+pymysql://med_admin:<la misma password de med_admin>@localhost:3306/amaymed
     AMAYMED_DB_HOST=localhost
     AMAYMED_DB_PORT=3306
     AMAYMED_DB_USER=med_admin
     AMAYMED_DB_PASSWORD=<la misma password de med_admin>
     AMAYMED_DB_NAME=amaymed
+
+Si falta AMAYMED_DB_URL, migrations/migrador_medicos.py y todos los
+migradores (migrations/migrador_base.py) caen a un password por
+defecto ("gesmed01") que casi seguro no es el tuyo, y fallan con:
+
+    sqlalchemy.exc.OperationalError: ... Access denied for user
+    'med_admin'@'localhost' (using password: YES)
+
+Las variables AMAYMED_DB_HOST/PORT/USER/PASSWORD/NAME por separado
+las usa solo migrations/orquestador.py para el backup automático con
+mysqldump — no reemplazan a AMAYMED_DB_URL, se necesitan ambas.
 
 ------------------------------------------------------------------------
 7. CONTINUAR CON LA MIGRACIÓN
