@@ -3,7 +3,45 @@ import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
-import esLocale from '@fullcalendar/core/locales/es'
+
+// Definido a mano (copia del locale oficial "es" de @fullcalendar/core) en
+// vez de "import esLocale from '@fullcalendar/core/locales/es'": el
+// package.json de @fullcalendar/core (desde v6) restringe "exports" a solo
+// ".", "./protected-api" y "./package.json", así que Vite/rolldown rechaza
+// cualquier import de una subruta como "./locales/es" con el error
+// "is not exported under the conditions [...] from package @fullcalendar/core"
+// aunque el archivo exista físicamente en node_modules.
+const esLocale = {
+    code: 'es',
+    week: { dow: 1, doy: 4 },
+    buttonText: {
+        prev: 'Ant', next: 'Sig', today: 'Hoy', year: 'Año',
+        month: 'Mes', week: 'Semana', day: 'Día', list: 'Agenda',
+    },
+    buttonHints: {
+        prev: '$0 antes',
+        next: '$0 siguiente',
+        today(buttonText) {
+            return (buttonText === 'Día') ? 'Hoy' :
+                ((buttonText === 'Semana') ? 'Esta' : 'Este') + ' ' + buttonText.toLocaleLowerCase()
+        },
+    },
+    viewHint(buttonText) {
+        return 'Vista ' + (buttonText === 'Semana' ? 'de la' : 'del') + ' ' + buttonText.toLocaleLowerCase()
+    },
+    weekText: 'Sm',
+    weekTextLong: 'Semana',
+    allDayText: 'Todo el día',
+    moreLinkText: 'más',
+    moreLinkHint(eventCnt) {
+        return `Mostrar ${eventCnt} eventos más`
+    },
+    noEventsText: 'No hay eventos para mostrar',
+    navLinkHint: 'Ir al $0',
+    closeHint: 'Cerrar',
+    timeHint: 'La hora',
+    eventHint: 'Evento',
+}
 
 export function CalendarioMedico({
     eventos = [],

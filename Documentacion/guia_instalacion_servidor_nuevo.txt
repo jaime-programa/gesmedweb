@@ -1,7 +1,7 @@
 ========================================================================
 GUÍA DE INSTALACIÓN — GesmedWeb en un servidor nuevo (Ubuntu 26.04)
 ========================================================================
-Última actualización: 2026-09-06
+Última actualización: 2026-09-06 (fix de paquetes npm de FullCalendar)
 
 Esta guía instala GesmedWeb desde cero en un servidor limpio, usando:
   - Dump de ESTRUCTURA (no create_all() de SQLModel) para regenerar el
@@ -326,6 +326,32 @@ run, export), siempre que .web/ ya exista. No requiere ningún paso
 manual adicional, pero si en el futuro se agrega otro componente JSX
 escrito a mano, debe guardarse en GesmedWeb/custom_components/ (no
 solo en .web/) para que sobreviva un clon nuevo del repo.
+
+Nota sobre paquetes npm de FullCalendar: por la misma razón (.web/
+regenerado desde cero no conserva nada instalado a mano con
+"bun add"), el build de producción podía fallar en un servidor/clon
+nuevo con:
+
+    [plugin:vite:import-analysis] Failed to resolve import
+    "@fullcalendar/react" from "calendario_medico.jsx"
+
+Ya se resolvió: rxconfig.py corre automáticamente "bun add" para los
+paquetes @fullcalendar/{react,daygrid,timegrid,interaction,core}, fijos
+en la versión 6.1.21 para los 5 (ver _instalar_paquetes_npm_custom en
+rxconfig.py), la primera vez que corre cualquier comando reflex con
+.web/ ya creado y sin @fullcalendar/react instalado todavía. IMPORTANTE:
+no declarar estos paquetes en "lib_dependencies" del componente
+CalendarioMedico (GesmedWeb/componentes/calendario_fc.py) — reflex sí
+lo procesa, pero instala la ÚLTIMA versión de cada paquete sin respetar
+compatibilidad entre ellos: resuelve @fullcalendar/core y
+@fullcalendar/react a v7.x (que ya no expone
+"@fullcalendar/core/locales/*" ni "/internal.js" como antes) mientras
+daygrid/timegrid/interaction quedan en v6.x, una combinación
+incompatible que rompe el build con errores de resolución de imports.
+Si algún día hace falta subir de versión, hay que fijar los 5 paquetes
+a la MISMA versión nueva a la vez en _PAQUETES_NPM_CUSTOM (rxconfig.py)
+y probar un build de producción completo antes de dar por buena la
+actualización.
 
 Para producción real (proceso persistente + reverse proxy), lo habitual
 es agregar sobre esto:

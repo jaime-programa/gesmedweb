@@ -3,12 +3,22 @@ import reflex as rx
 
 class CalendarioMedico(rx.Component):
     """Wrapper Reflex para FullCalendar.
-    El archivo JSX vive en .web/calendario_medico.jsx.
-    Instalar paquetes (una vez): cd .web && bun add @fullcalendar/react
-        @fullcalendar/daygrid @fullcalendar/timegrid @fullcalendar/interaction
+    El archivo JSX vive en .web/calendario_medico.jsx (copiado ahí
+    automáticamente por rxconfig.py desde
+    GesmedWeb/custom_components/calendario_medico.jsx).
     """
     library = "$/calendario_medico"
     tag = "CalendarioMedico"
+
+    # NO declarar lib_dependencies aquí: reflex sí lo procesa (a diferencia
+    # de lo que sugiere la ausencia de version pin), pero instala la última
+    # versión de cada paquete sin respetar compatibilidad entre ellos —
+    # eso resolvía @fullcalendar/core y @fullcalendar/react a v7.x mientras
+    # daygrid/timegrid/interaction quedaban en v6.x, una combinación
+    # incompatible que rompe el build de producción. Los paquetes de
+    # FullCalendar se instalan en su lugar desde rxconfig.py
+    # (_instalar_paquetes_npm_custom), con las 5 versiones fijadas a
+    # 6.1.21 para que queden en lockstep.
 
     # Props reactivos
     eventos: rx.Var[list]

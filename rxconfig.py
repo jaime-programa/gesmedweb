@@ -123,6 +123,71 @@ def _instalar_componentes_custom():
 _instalar_componentes_custom()
 
 
+# Paquetes npm que necesita GesmedWeb/componentes/calendario_fc.py (JSX
+# escrito a mano, no una librería real de npm). El campo lib_dependencies
+# de rx.Component no los instala en esta versión de reflex, así que se
+# instalan aquí a mano — mismo patrón self-healing que _instalar_componentes_custom.
+#
+# Versión fijada a 6.1.21 en TODOS los paquetes a propósito: @fullcalendar
+# publicó un v7 de @fullcalendar/react y @fullcalendar/core que rompe el
+# import "@fullcalendar/core/locales/es" que usa calendario_medico.jsx (el
+# paquete ya no expone esa ruta bajo ESM), mientras que daygrid/timegrid/
+# interaction siguen solo en v6. Sin fijar versión, "bun add" instala la
+# combinación incompatible (core/react en 7.x, el resto en 6.x) y el build
+# de producción falla con:
+#   Error: Errored while resolving "@fullcalendar/core/locales/es" ...
+#   "./locales/es" is not exported under the conditions [...] from package
+#   .web/node_modules/@fullcalendar/core
+_PAQUETES_NPM_CUSTOM = [
+    "@fullcalendar/react@6.1.21",
+    "@fullcalendar/daygrid@6.1.21",
+    "@fullcalendar/timegrid@6.1.21",
+    "@fullcalendar/interaction@6.1.21",
+    "@fullcalendar/core@6.1.21",
+]
+
+
+def _instalar_paquetes_npm_custom():
+    """
+    Corre "bun add" para los paquetes de FullCalendar si no están ya
+    instalados en .web/node_modules.
+
+    Sin esto, el build/dev server falla con:
+        [plugin:vite:import-analysis] Failed to resolve import
+        "@fullcalendar/react" from "calendario_medico.jsx"
+    cada vez que .web/ se genera desde cero (clon nuevo del repo, o
+    "reflex init" tras borrar .web/) — el "bun add" manual que menciona
+    el docstring de calendario_fc.py se pierde en cada regeneración
+    porque nadie se acuerda de correrlo otra vez.
+    """
+    try:
+        web_dir = pathlib.Path(__file__).parent / ".web"
+        if not web_dir.exists():
+            return
+        primero = _PAQUETES_NPM_CUSTOM[0].rsplit("@", 1)[0]  # "@fullcalendar/react"
+        if (web_dir / "node_modules" / primero).exists():
+            return
+
+        import subprocess
+        from reflex_base.constants.installer import Bun
+
+        bun_path = Bun.DEFAULT_PATH
+        if not pathlib.Path(bun_path).exists():
+            return  # bun no instalado todavía (primer "reflex init" en curso)
+
+        subprocess.run(
+            [str(bun_path), "add", *_PAQUETES_NPM_CUSTOM],
+            cwd=str(web_dir),
+            timeout=180,
+            capture_output=True,
+        )
+    except Exception:
+        pass
+
+
+_instalar_paquetes_npm_custom()
+
+
 def _precargar_ocr():
     """Precarga PaddleOCR al arranque para que el primer médico no espere."""
     try:
