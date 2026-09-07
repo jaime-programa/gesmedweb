@@ -1,5 +1,16 @@
+import os
 import pathlib
 import reflex as rx
+
+from dotenv import load_dotenv
+
+# GesmedWeb/*.py lee GESMED_MASTER_KEY, GESMED_DB_URL, GESMED_API_URL, etc.
+# vía os.environ.get(...), pero a diferencia de los scripts en migrations/
+# (que llaman load_dotenv ellos mismos), la app en sí nunca cargaba .env —
+# dependía de que el proceso ya tuviera esas variables exportadas en el
+# shell. Se carga aquí explícitamente para que "reflex run" funcione igual
+# sin importar cómo se lance el proceso.
+load_dotenv(pathlib.Path(__file__).parent / ".env")
 
 
 def _patch_reflex_dispatch_guard():
@@ -201,8 +212,22 @@ def _precargar_ocr():
 _precargar_ocr()
 
 
+# api_url: host que el BACKEND usa para construir URLs absolutas propias
+# (p.ej. GesmedWeb/state.py y querys/resultados_querys.py arman
+# f"{api_url}/imagen/{id_imagen}" para el <img src=...> de resultados).
+# Si se deja el default de Reflex ("http://localhost:8000"), ese host queda
+# fijo en cada URL sin importar qué cliente la reciba: funciona al navegar
+# desde la misma Mac que corre el servidor, pero un cliente remoto (otra
+# máquina en la LAN, ej. un Linux) recibe una URL que apunta a "localhost"
+# — su PROPIO localhost, no el de la Mac — y la imagen nunca carga aunque
+# sí se subió correctamente. Se soluciona fijando GESMED_API_URL en .env
+# con la IP/hostname real de la Mac servidor, ej.:
+#   GESMED_API_URL=http://192.168.100.14:8000
+GESMED_API_URL = os.environ.get("GESMED_API_URL", "http://localhost:8000")
+
 config = rx.Config(
     app_name="GesmedWeb",
+    api_url=GESMED_API_URL,
     plugins=[
         rx.plugins.SitemapPlugin(),
         rx.plugins.TailwindV4Plugin(),

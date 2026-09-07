@@ -162,6 +162,17 @@ Crear el archivo .env en la raíz del proyecto:
 
 (GEODATA_DB_URL ya no es necesaria — se puede omitir del .env.)
 
+    # IP LAN (o dominio) real de ESTE servidor — sin esto, las imágenes de
+    # resultados (módulo Resultados de Exámenes) suben bien pero NO CARGAN
+    # al navegar desde otra máquina de la red (solo se ven desde el propio
+    # servidor). Causa: state.py/resultados_querys.py arman el <img src=...>
+    # con rx.Config.api_url; sin GESMED_API_URL, Reflex usa por defecto
+    # "http://localhost:8000", que queda fijo en la URL sin importar qué
+    # cliente la reciba — un cliente remoto interpreta "localhost" como SU
+    # PROPIA máquina, no el servidor. Puerto 8000 = backend_port por defecto
+    # de Reflex (ajustar si se cambia explícitamente).
+    GESMED_API_URL=http://<IP-LAN-de-este-servidor>:8000
+
 NOTA sobre carga de .env: todos los scripts en migrations/ (parametros_
 fijos.py, orquestador.py, crear_admin_inicial.py, verificar_estructura.py,
 upsert_medicamento_presentacion.py) cargan el .env automáticamente con
@@ -170,6 +181,9 @@ python-dotenv (load_dotenv), así que ejecutarlos con
 requirements.txt ya incluye python-dotenv — no hace falta instalarlo
 aparte, solo asegurarse de correr "pip install -r requirements.txt"
 (paso 4) antes de estos scripts.
+rxconfig.py también carga .env explícitamente (mismo mecanismo) para que
+"reflex run" lea GESMED_API_URL sin depender de que el proceso ya tenga
+esas variables exportadas en el shell.
 
 CRÍTICO: si este servidor va a recibir datos migrados desde amaymed
 (paciente, diagnostico, prescripcion — todos con campos cifrados
