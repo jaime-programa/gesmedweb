@@ -69,12 +69,19 @@ class MigradorPrescripcion(MigradorTabla):
         # Defaults para campos que podrían faltar
         r.setdefault("cantidad", 1)
 
-        # lk_presentacion = 0 viola FK; en amaymed era texto libre → NULL
-        if not r.get("lk_presentacion"):
+        # lk_presentacion: 0/None viola FK (en amaymed era texto libre), y un
+        # valor real de amaymed también puede no existir en el catálogo fijo
+        # de gesmed.medicamento_presentacion (catálogo congelado por separado,
+        # ver parametros_fijos.py) → en ambos casos, NULL en vez de IntegrityError.
+        if r.get("lk_presentacion") not in getattr(self, "_presentacion_validos", set()):
             r["lk_presentacion"] = None
 
-        # lk_generico = 0 viola FK; si no hay generico válido → NULL
-        if not r.get("lk_generico"):
+        # lk_generico: mismo caso que lk_presentacion. amaymed no valida contra
+        # ningún catálogo (era texto libre / IDs propios), así que puede traer
+        # códigos que no existen en el catálogo fijo de gesmed.medicamentos
+        # (p.ej. cod_gen=474 cuando el AUTO_INCREMENT de gesmed.medicamentos
+        # solo llega hasta 473) → NULL en vez de IntegrityError.
+        if r.get("lk_generico") not in getattr(self, "_generico_validos", set()):
             r["lk_generico"] = None
 
         return r
@@ -90,6 +97,8 @@ class MigradorPrescripcion(MigradorTabla):
         mapa = self.mapeo_campos()
 
         mapa_pacientes = self._cargar_mapa_pacientes()
+        self._generico_validos = self._cargar_generico_validos()
+        self._presentacion_validos = self._cargar_presentacion_validos()
 
         with Session(self._engine_destino) as session:
             for reg in registros:
@@ -132,6 +141,16 @@ class MigradorPrescripcion(MigradorTabla):
             flush=True,
         )
         return {"exitosos": exitosos, "errores": errores, "total": total}
+
+    def _cargar_generico_validos(self) -> set[int]:
+        """cod_gen existentes en el catálogo fijo gesmed.medicamentos."""
+        with Session(self._engine_destino) as s:
+            return set(s.execute(text("SELECT cod_gen FROM medicamentos")).scalars().all())
+
+    def _cargar_presentacion_validos(self) -> set[int]:
+        """id_presentacion existentes en el catálogo fijo gesmed.medicamento_presentacion."""
+        with Session(self._engine_destino) as s:
+            return set(s.execute(text("SELECT id_presentacion FROM medicamento_presentacion")).scalars().all())
 
     def _cargar_mapa_pacientes(self) -> dict[str, int]:
         """Descifra nombre_completo de amaymed.paciente → {NOMBRE_UPPER: nro_hclinica}."""

@@ -1,7 +1,7 @@
 ========================================================================
 GUÍA DE INSTALACIÓN — GesmedWeb en un servidor nuevo (Ubuntu 26.04)
 ========================================================================
-Última actualización: 2026-09-06 (fix de paquetes npm de FullCalendar)
+Última actualización: 2026-09-06 (fix del rollback destructivo del orquestador de migración y de errores puntuales en prescripcion/certificado)
 
 Esta guía instala GesmedWeb desde cero en un servidor limpio, usando:
   - Dump de ESTRUCTURA (no create_all() de SQLModel) para regenerar el
@@ -293,6 +293,24 @@ nuevo debe quedar con los datos clínicos migrados desde amaymed
          pedido_imagen
       6. Verifica conteos origen vs destino por tabla
       7. Reporte final; si algo falla, no continúa a ciegas
+
+    IMPORTANTE sobre errores por registro (FK huérfana, fecha inválida,
+    referencia sin resolver, etc.): el orquestador YA NO hace rollback
+    completo de gesmed cuando aparecen — solo hace rollback (restaura el
+    backup de gesmed tomado en el paso 1) ante un fallo CRÍTICO real
+    (excepción no controlada, típicamente un problema de conexión o de
+    esquema). Antes, un solo error puntual en cualquiera de las 11 tablas
+    (por ejemplo, una prescripción con lk_generico apuntando a un código
+    que no existe en el catálogo fijo de medicamentos) disparaba un
+    rollback de TODA la base, borrando también las tablas que habían
+    migrado el 100% de sus registros sin errores. Ahora esas tablas
+    "buenas" quedan en gesmed aunque otras tengan errores puntuales; el
+    reporte final lista cada error con su id para revisarlo/corregirlo
+    a mano si hace falta. También se corrigieron dos causas concretas de
+    errores puntuales que aparecían en la práctica: lk_generico/
+    lk_presentacion huérfanos en prescripcion (ahora caen a NULL en vez
+    de violar la FK) y fechas legado "0000-00-00" en certificado (ahora
+    caen a la fecha del certificado en vez de tirar ValueError).
 
 8.5 Upsert de tablas no cubiertas por el orquestador (si aplica):
 

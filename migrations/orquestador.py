@@ -138,6 +138,7 @@ class OrquestadorMigracion:
         print("\n[4/5] Migrando datos...")
         migradores = self._construir_migradores()
         exito_total = True
+        hubo_error_critico = False
 
         for nombre, migrador in migradores.items():
             try:
@@ -146,8 +147,14 @@ class OrquestadorMigracion:
                 print(f"  ✗ {nombre}: excepción no capturada — {exc}")
                 resultado = {"exitosos": 0, "errores": [{"id": "?", "error": str(exc)}], "total": 0}
                 exito_total = False
+                hubo_error_critico = True
             self._reporte.append({"tabla": nombre, **resultado})
             if resultado["errores"]:
+                # Errores puntuales por registro (FK huérfana, fecha inválida,
+                # referencia sin resolver, etc.) marcan la migración como "no
+                # 100% limpia" pero NO son un fallo crítico: son esperables en
+                # datos legados y no deben tirar abajo las tablas que sí se
+                # migraron bien (ver más abajo, no disparan rollback).
                 exito_total = False
                 for err in resultado["errores"][:3]:
                     print(f"      ✗ id={err['id']}  {err['error']}")
@@ -161,16 +168,38 @@ class OrquestadorMigracion:
             except Exception as exc:
                 v = {"tabla": migrador.tabla_destino(), "origen": "?", "destino": "?", "ok": False}
                 print(f"  ✗ verificación fallida: {exc}")
+                hubo_error_critico = True
             verificaciones.append(v)
             estado = "✓" if v["ok"] else "✗"
             print(f"  {estado} {v['tabla']:20s}  origen={v['origen']}  destino={v['destino']}")
             if not v["ok"]:
+                # Un conteo origen≠destino es la consecuencia esperada de los
+                # errores por registro ya reportados arriba (esas filas no se
+                # insertaron a propósito) — no es evidencia nueva de un fallo
+                # estructural, así que tampoco dispara rollback por sí solo.
                 exito_total = False
 
-        # ── Rollback si hubo fallos ───────────────────────────────────────────
-        if not exito_total:
-            print("\n  ⚠ Se detectaron errores. Ejecutando rollback...")
+        # ── Rollback SOLO ante fallo crítico/estructural ──────────────────────
+        # Antes, cualquier error (incluyendo errores esperables por registro,
+        # como una FK huérfana en 1 de 1068 prescripciones) disparaba un
+        # rollback de TODA la base gesmed, borrando también las tablas que
+        # habían migrado el 100% de sus registros sin un solo error (p.ej.
+        # paciente/atencion/diagnostico). El rollback ahora solo se dispara
+        # ante un fallo crítico real (excepción no controlada en migrar() o
+        # verificar_migracion() — típicamente un problema de conexión/esquema,
+        # no un dato puntual mal formado). Los errores por registro quedan
+        # en gesmed (las tablas buenas permanecen intactas) y se listan en el
+        # reporte final para corregirlos/reintentarlos puntualmente.
+        if hubo_error_critico:
+            print("\n  ⚠ Fallo crítico detectado. Ejecutando rollback...")
             self._rollback()
+        elif not exito_total:
+            print(
+                "\n  ⚠ Hubo errores en registros individuales (ver reporte abajo). "
+                "NO se hizo rollback: las tablas migradas sin errores permanecen "
+                "en gesmed. Revise y corrija los registros listados y vuelva a "
+                "migrarlos puntualmente si hace falta."
+            )
 
         # ── Reporte final ─────────────────────────────────────────────────────
         self._imprimir_reporte(tiempo=time.time() - inicio, exito=exito_total)

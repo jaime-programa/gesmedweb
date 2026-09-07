@@ -56,19 +56,35 @@ class MigradorCertificado(MigradorTabla):
     def transformar_registro(self, registro: dict) -> dict:
         r = dict(registro)
 
+        # fecha_certificado no existe en amaymed.certificados → usar fecha de migración
+        r.setdefault("fecha_certificado", datetime.datetime.now())
+        fecha_respaldo = r["fecha_certificado"]
+        if isinstance(fecha_respaldo, datetime.datetime):
+            fecha_respaldo = fecha_respaldo.date()
+
         # Normalizar fechas a datetime.date
         for campo_fecha in ("reposo_desde", "reposo_hasta"):
             val = r.get(campo_fecha)
             if isinstance(val, str):
-                try:
-                    r[campo_fecha] = datetime.date.fromisoformat(val)
-                except ValueError:
-                    r[campo_fecha] = datetime.datetime.strptime(val, "%d/%m/%Y").date()
+                val = val.strip()
+                # MySQL "zero date" legado ('0000-00-00', también con hora
+                # '0000-00-00 00:00:00'): significa "sin fecha", no un dato a
+                # parsear — ni fromisoformat ni strptime("%d/%m/%Y") lo aceptan
+                # y explotaban con ValueError, tirando la fila entera a error.
+                # gesmed.certificado.reposo_desde/hasta son NOT NULL, así que
+                # no se puede dejar en NULL: se usa fecha_certificado como
+                # respaldo (equivale a "0 días de reposo" en vez de perder la fila).
+                if not val or val.startswith("0000-00-00"):
+                    r[campo_fecha] = fecha_respaldo
+                else:
+                    try:
+                        r[campo_fecha] = datetime.date.fromisoformat(val)
+                    except ValueError:
+                        r[campo_fecha] = datetime.datetime.strptime(val, "%d/%m/%Y").date()
             elif isinstance(val, datetime.datetime):
                 r[campo_fecha] = val.date()
-
-        # fecha_certificado no existe en amaymed.certificados → usar fecha de migración
-        r.setdefault("fecha_certificado", datetime.datetime.now())
+            elif val is None:
+                r[campo_fecha] = fecha_respaldo
 
         # Defaults NOT NULL de gesmed (por si amaymed trae NULL/vacío)
         r.setdefault("contingencia", "")
