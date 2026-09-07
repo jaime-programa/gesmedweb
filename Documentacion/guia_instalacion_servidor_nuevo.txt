@@ -309,8 +309,14 @@ nuevo debe quedar con los datos clínicos migrados desde amaymed
     a mano si hace falta. También se corrigieron dos causas concretas de
     errores puntuales que aparecían en la práctica: lk_generico/
     lk_presentacion huérfanos en prescripcion (ahora caen a NULL en vez
-    de violar la FK) y fechas legado "0000-00-00" en certificado (ahora
-    caen a la fecha del certificado en vez de tirar ValueError).
+    de violar la FK), fechas legado "0000-00-00" en certificado (ahora
+    caen a la fecha del certificado en vez de tirar ValueError), y
+    pedidos de imagen sin CIE10 asociado en pedido_imagen (amaymed no
+    garantizaba ese vínculo — 728 de 2192 pedidos no tenían ninguno; ahora
+    el migrador cae al diagnóstico más reciente del mismo paciente en vez
+    de descartar la fila, porque gesmed.examen_pedido.lk_diagnostico es
+    NOT NULL — decisión de negocio confirmada con el usuario, no una
+    corrección "neutra": el diagnóstico vinculado puede no ser exacto).
 
 8.5 Upsert de tablas no cubiertas por el orquestador (si aplica):
 

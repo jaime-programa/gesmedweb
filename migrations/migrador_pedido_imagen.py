@@ -25,11 +25,20 @@ Diferencias de esquema:
                        fecha_pedido)
       - lk_diagnostico: vía pedido_imagen_cie.cie10_pedido, buscando en
                        amaymed.diagnostico un registro del mismo paciente con
-                       ese cod_cie10 (el más reciente si hay varios)
+                       ese cod_cie10 (el más reciente si hay varios). Si el
+                       pedido no tiene ningún cie10_pedido asociado (dato
+                       ausente real: en amaymed, 728 de 2192 pedidos nunca
+                       tuvieron un CIE10 vinculado en pedido_imagen_cie),
+                       se cae al diagnóstico más reciente del mismo paciente
+                       sin importar el código — decisión confirmada con el
+                       usuario, porque lk_diagnostico es NOT NULL en
+                       gesmed.examen_pedido y amaymed nunca garantizó ese
+                       vínculo.
       - detalle_pedido: el texto libre del campo, truncado a 150 caracteres
 
-    Si no se puede resolver lk_atencion o lk_diagnostico (ambas NOT NULL en
-    gesmed), esa fila se descarta y se registra como error — no se inserta
+    Si no se puede resolver lk_atencion (NOT NULL en gesmed) o el paciente no
+    tiene NINGÚN diagnóstico registrado en amaymed (ni siquiera para caer de
+    respaldo), esa fila se descarta y se registra como error — no se inserta
     con NULL.
 
     Ninguna columna de gesmed.examen_pedido es BLOB → sin cifrado.
@@ -84,6 +93,7 @@ class MigradorPedidoImagen(MigradorTabla):
         mapa_atenciones = self._cargar_mapa_atenciones()
         mapa_cies_pedido = self._cargar_mapa_cies_pedido()
         mapa_diagnosticos = self._cargar_mapa_diagnosticos()
+        mapa_diagnosticos_paciente = self._cargar_mapa_diagnosticos_por_paciente()
 
         exitosos = 0
         errores: list[dict] = []
@@ -100,6 +110,12 @@ class MigradorPedidoImagen(MigradorTabla):
 
                 cies = mapa_cies_pedido.get(pedido["id_pedido"], [])
                 id_diagnostico = self._resolver_diagnostico(mapa_diagnosticos, nombre_pac, cies)
+                if id_diagnostico is None:
+                    # Sin cie10_pedido asociado (o sin match) → respaldo: el
+                    # diagnóstico más reciente del paciente, sin filtrar por código.
+                    candidatos = mapa_diagnosticos_paciente.get(nombre_pac)
+                    if candidatos:
+                        id_diagnostico = candidatos[-1][1]
 
                 for campo, alias in ALIAS_POR_CAMPO.items():
                     texto = str(pedido.get(campo) or "").strip()
@@ -205,6 +221,21 @@ class MigradorPedidoImagen(MigradorTabla):
                 mapa.setdefault(clave, []).append((row.fecha_diagnostico, row.id_diagnostico))
         for clave in mapa:
             mapa[clave].sort(key=lambda t: t[0])
+        return mapa
+
+    def _cargar_mapa_diagnosticos_por_paciente(self) -> dict[str, list[tuple[datetime.date, int]]]:
+        """{NOMBRE_PACIENTE_UPPER: [(fecha_diagnostico, id_diagnostico), ...]} — respaldo
+        cuando el pedido no tiene cie10_pedido asociado (sin filtrar por código)."""
+        mapa: dict[str, list[tuple[datetime.date, int]]] = {}
+        with Session(self._engine_origen) as s:
+            filas = s.execute(text(
+                "SELECT nombre_paciente, id_diagnostico, fecha_diagnostico FROM diagnostico"
+            ))
+            for row in filas:
+                nombre = str(row.nombre_paciente or "").strip().upper()
+                mapa.setdefault(nombre, []).append((row.fecha_diagnostico, row.id_diagnostico))
+        for nombre in mapa:
+            mapa[nombre].sort(key=lambda t: t[0])
         return mapa
 
     # ── Resolución de FKs ────────────────────────────────────────────────────────
