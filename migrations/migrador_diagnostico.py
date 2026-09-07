@@ -90,6 +90,8 @@ class MigradorDiagnostico(MigradorTabla):
         mapa = self.mapeo_campos()
 
         mapa_pacientes = self._cargar_mapa_pacientes()
+        mapa_medicos = self._cargar_mapa_medicos()
+        sin_medico = 0
 
         with Session(self._engine_destino) as session:
             for reg in registros:
@@ -102,6 +104,14 @@ class MigradorDiagnostico(MigradorTabla):
 
                     nombre_pac = str(reg.get("nombre_paciente") or "").strip().upper()
                     mapeado["lk_paciente"] = mapa_pacientes.get(nombre_pac)
+
+                    # Resolver lk_medico desde medico_diagnostica; si no hay
+                    # match, cae al medico_id de respaldo del constructor.
+                    nombre_med = str(reg.get("medico_diagnostica") or "").strip().upper()
+                    if nombre_med in mapa_medicos:
+                        mapeado["lk_medico"] = mapa_medicos[nombre_med]
+                    else:
+                        sin_medico += 1
 
                     transformado = self.transformar_registro(mapeado)
 
@@ -126,12 +136,26 @@ class MigradorDiagnostico(MigradorTabla):
                           not in mapa_pacientes)
         if no_resueltos:
             print(f"  ⚠ {no_resueltos} diagnósticos sin lk_paciente (nombre no encontrado)", flush=True)
+        if sin_medico:
+            print(
+                f"  ⚠ {sin_medico} diagnósticos sin medico_diagnostica reconocido, "
+                f"asignados al medico_id de respaldo ({self.medico_id})",
+                flush=True,
+            )
         print(
             f"  {estado} {exitosos}/{total} registros migrados"
             + (f"  ({len(errores)} errores)" if errores else ""),
             flush=True,
         )
         return {"exitosos": exitosos, "errores": errores, "total": total}
+
+    def _cargar_mapa_medicos(self) -> dict[str, int]:
+        """gesmed.points ya migrado → {NOMBRE_MEDICO_UPPER: id_medico}."""
+        mapa: dict[str, int] = {}
+        with Session(self._engine_destino) as s:
+            for row in s.execute(text("SELECT id_medico, nombre_medico FROM points")):
+                mapa[str(row.nombre_medico).strip().upper()] = row.id_medico
+        return mapa
 
     def _cargar_mapa_pacientes(self) -> dict[str, int]:
         """Descifra nombre_completo de amaymed.paciente → {NOMBRE_UPPER: nro_hclinica}."""

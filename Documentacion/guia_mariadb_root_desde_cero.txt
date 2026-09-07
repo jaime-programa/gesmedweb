@@ -1,0 +1,204 @@
+========================================================================
+GUÍA — Instalar MariaDB desde cero en Linux Mint y entrar como root
+========================================================================
+Última actualización: 2026-09-06
+
+Objetivo: dejar MariaDB instalado y funcionando, con acceso confirmado
+como root, ANTES de crear el usuario med_admin que usará GesmedWeb.
+La mayoría de los errores "Access denied" que vienes viendo ocurren
+porque en Debian/Ubuntu/Mint el usuario root de MariaDB NO se autentica
+con contraseña por defecto, sino con el plugin "unix_socket" (autentica
+por el usuario del sistema operativo). Si no sabes esto, es fácil
+terminar con una instalación a medias o con credenciales que no
+funcionan como esperas. Esta guía lo deja explícito paso a paso.
+
+------------------------------------------------------------------------
+0. SI YA INTENTASTE INSTALAR ANTES (limpiar y empezar de cero)
+------------------------------------------------------------------------
+Si MariaDB ya está instalado y quieres partir de cero por los problemas
+de acceso, puedes desinstalarlo completamente (esto BORRA todas las
+bases de datos existentes en este servidor — confirmar que no hay nada
+que quieras conservar):
+
+    sudo systemctl stop mariadb
+    sudo apt purge -y mariadb-server mariadb-client mariadb-common
+    sudo rm -rf /etc/mysql /var/lib/mysql
+    sudo apt autoremove -y
+
+Si NO quieres borrar datos existentes, sáltate este paso y continúa
+directo en el punto 1 (instalar sobre lo que ya hay no reinicia el
+usuario root, así que si el problema es de credenciales esto no lo
+arregla — en ese caso ve directo al punto 4).
+
+------------------------------------------------------------------------
+1. INSTALAR MARIADB
+------------------------------------------------------------------------
+    sudo apt update
+    sudo apt install -y mariadb-server mariadb-client
+
+Al terminar, el servicio debería quedar corriendo automáticamente.
+Verificar:
+
+    sudo systemctl status mariadb
+
+Debe decir "active (running)". Si no, arrancarlo:
+
+    sudo systemctl enable --now mariadb
+
+------------------------------------------------------------------------
+2. ENTRAR COMO ROOT POR PRIMERA VEZ (vía sudo, sin contraseña)
+------------------------------------------------------------------------
+Justo después de instalar, el usuario root de MariaDB usa el plugin
+"unix_socket": no tiene contraseña, se autentica automáticamente si el
+comando se ejecuta con sudo (es decir, como el usuario "root" del
+sistema operativo). Por eso el acceso correcto en este punto es:
+
+    sudo mariadb
+
+(o "sudo mysql", es un alias del mismo binario)
+
+Esto te deja directo en el prompt "MariaDB [(none)]>" SIN pedir
+contraseña. Si en cambio intentas:
+
+    mysql -u root -p
+
+vas a ver típicamente:
+
+    ERROR 1698 (28000): Access denied for user 'root'@'localhost'
+
+Esto es ESPERADO en este punto — no es un error de instalación, es que
+root todavía usa unix_socket y no una contraseña. La forma correcta de
+entrar por ahora es "sudo mariadb", como arriba.
+
+Sal del prompt con:
+
+    exit
+
+------------------------------------------------------------------------
+3. EJECUTAR mysql_secure_installation
+------------------------------------------------------------------------
+    sudo mysql_secure_installation
+
+Preguntas que hace y qué responder:
+
+    - "Enter current password for root": presiona ENTER (vacío, no hay
+      contraseña todavía).
+    - "Switch to unix_socket authentication": responder "n" (NO) — si
+      dices que sí, refuerza el método unix_socket y complica dar a
+      root una contraseña más adelante si la necesitas. Como en el
+      punto 4 configuraremos root con contraseña explícitamente, es
+      más simple decir "n" aquí.
+    - "Change the root password": responder "Y" y definir una
+      contraseña fuerte para root (anótala, la necesitas en el punto 4
+      si decides no usar solo unix_socket).
+    - "Remove anonymous users": "Y"
+    - "Disallow root login remotely": "Y" (root solo debe entrar desde
+      el propio servidor)
+    - "Remove test database": "Y"
+    - "Reload privilege tables now": "Y"
+
+------------------------------------------------------------------------
+4. CONFIRMAR CÓMO QUEDÓ EL ACCESO DE ROOT
+------------------------------------------------------------------------
+Entrar de nuevo con:
+
+    sudo mariadb
+
+Y revisar qué plugin de autenticación quedó activo para root:
+
+    SELECT user, host, plugin FROM mysql.user WHERE user = 'root';
+
+Vas a ver algo como:
+
+    +------+-----------+-----------------------+
+    | user | host      | plugin                |
+    +------+-----------+-----------------------+
+    | root | localhost | unix_socket            |
+    +------+-----------+-----------------------+
+
+Si "plugin" dice "unix_socket": root SOLO puede entrar con
+"sudo mariadb" (o "sudo mysql"), nunca con "mysql -u root -p" aunque
+pongas la contraseña correcta — es el comportamiento normal y no hace
+falta cambiarlo para seguir con esta guía (en el paso 5 crearemos
+med_admin, que sí usará contraseña normal).
+
+Si preferís que "mysql -u root -p" funcione también con contraseña
+(opcional, no es necesario para GesmedWeb), podés forzarlo así, dentro
+del mismo prompt "sudo mariadb":
+
+    ALTER USER 'root'@'localhost' IDENTIFIED VIA mysql_native_password
+      USING PASSWORD('<la contraseña que pusiste en mysql_secure_installation>');
+    FLUSH PRIVILEGES;
+
+Salir:
+
+    exit
+
+------------------------------------------------------------------------
+5. CREAR EL USUARIO med_admin (el que usará GesmedWeb)
+------------------------------------------------------------------------
+Este es el usuario que realmente necesita GesmedWeb — con contraseña
+normal (mysql_native_password), no unix_socket, porque la app se
+conecta por red/TCP, no como un usuario del sistema operativo.
+
+    sudo mariadb
+
+Dentro del prompt:
+
+    CREATE DATABASE gesmed CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+    CREATE USER 'med_admin'@'localhost' IDENTIFIED BY '<password-fuerte-nueva>';
+    GRANT ALL PRIVILEGES ON gesmed.* TO 'med_admin'@'localhost';
+    FLUSH PRIVILEGES;
+
+IMPORTANTE: anota exactamente esa <password-fuerte-nueva> — es la que
+va en GESMED_DB_PASSWORD y dentro de GESMED_DB_URL en el .env (ver
+sección 5 de la guía principal de instalación). Un error de tipeo aquí
+es la causa más común de "Access denied for user 'med_admin'@'localhost'"
+más adelante.
+
+Salir y probar el acceso de med_admin (ahora SÍ con -p, porque este
+usuario usa contraseña, no unix_socket):
+
+    exit
+    mysql -u med_admin -p gesmed
+
+Te debe pedir la contraseña y dejarte entrar directo a la base "gesmed"
+sin errores. Si aquí también falla con "Access denied", confirmar:
+
+    - Que escribiste la contraseña exactamente igual en el CREATE USER
+      y al conectarte ahora (sensible a mayúsculas/símbolos).
+    - Que el host es 'localhost' en ambos lados (si te conectas por
+      127.0.0.1 en vez de localhost, MariaDB a veces lo trata como un
+      host distinto — podés crear también
+      'med_admin'@'127.0.0.1' con la misma contraseña si hace falta).
+    - Verificar qué usuarios existen realmente:
+        sudo mariadb -e "SELECT user, host, plugin FROM mysql.user;"
+
+------------------------------------------------------------------------
+6. VERIFICAR QUE MARIADB ESCUCHA CORRECTAMENTE
+------------------------------------------------------------------------
+    sudo ss -tlnp | grep 3306
+
+Debe aparecer un proceso "mysqld" o "mariadbd" escuchando en 127.0.0.1
+(o 0.0.0.0 si configuraste bind-address distinto, ver sección 10.7 de
+la guía principal para el caso de acceso vía VPN). Si no aparece nada,
+el servicio no está corriendo — revisar:
+
+    sudo systemctl status mariadb
+    sudo journalctl -u mariadb -n 50 --no-pager
+
+------------------------------------------------------------------------
+RESUMEN RÁPIDO
+------------------------------------------------------------------------
+1. sudo apt install -y mariadb-server mariadb-client
+2. sudo mariadb                    → entra sin contraseña (unix_socket)
+3. sudo mysql_secure_installation  → definir password de root, limpiar
+4. sudo mariadb → SELECT user,host,plugin FROM mysql.user WHERE user='root';
+   (confirmar que "sudo mariadb" sigue siendo la forma de entrar como root)
+5. Dentro de "sudo mariadb": CREATE DATABASE gesmed; CREATE USER
+   'med_admin'@'localhost' IDENTIFIED BY '...'; GRANT ALL ...
+6. Probar: mysql -u med_admin -p gesmed   → debe entrar sin error
+
+Con esto listo, continuar desde la sección 3 (ESTRUCTURA DE LA BASE DE
+DATOS) de guia_instalacion_servidor_nuevo.txt.
+========================================================================

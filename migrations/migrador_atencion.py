@@ -7,7 +7,12 @@ Diferencias de esquema:
 
     lk_paciente se resuelve descifrando amaymed.paciente.nombre_completo
     y comparando con atencion.nombre_paciente. Si no hay match → NULL.
-    lk_medico se fija a medico_id del constructor.
+
+    lk_medico se resuelve comparando atencion.medico_atiende contra
+    gesmed.points.nombre_medico (los médicos deben estar migrados con
+    migrations.migrador_medicos antes de correr esto). Si no hay match,
+    cae al medico_id del constructor, que en este flujo actúa como ID de
+    respaldo (fallback), no como "el médico de toda la tanda".
 
     Columnas de amaymed descartadas (no existen en gesmed):
         nombre_paciente, medico_atiende, ya_facturado,
@@ -59,6 +64,9 @@ class MigradorAtencion(MigradorTabla):
 
         # Descifrar nombres de amaymed.paciente para resolver lk_paciente
         mapa_pacientes = self._cargar_mapa_pacientes()
+        # Médicos ya migrados en gesmed.points, para resolver lk_medico
+        mapa_medicos = self._cargar_mapa_medicos()
+        sin_medico = 0
 
         with Session(self._engine_destino) as session:
             for reg in registros:
@@ -73,6 +81,14 @@ class MigradorAtencion(MigradorTabla):
                     # Resolver lk_paciente desde nombre_paciente
                     nombre_pac = str(reg.get("nombre_paciente") or "").strip().upper()
                     mapeado["lk_paciente"] = mapa_pacientes.get(nombre_pac)
+
+                    # Resolver lk_medico desde medico_atiende; si no hay match,
+                    # cae al medico_id de respaldo pasado al constructor.
+                    nombre_med = str(reg.get("medico_atiende") or "").strip().upper()
+                    if nombre_med in mapa_medicos:
+                        mapeado["lk_medico"] = mapa_medicos[nombre_med]
+                    else:
+                        sin_medico += 1
 
                     transformado = self.transformar_registro(mapeado)
                     self._insertar(session, transformado)
@@ -90,12 +106,26 @@ class MigradorAtencion(MigradorTabla):
                           not in mapa_pacientes)
         if no_resueltos:
             print(f"  ⚠ {no_resueltos} atenciones sin lk_paciente (nombre no encontrado)", flush=True)
+        if sin_medico:
+            print(
+                f"  ⚠ {sin_medico} atenciones sin medico_atiende reconocido, "
+                f"asignadas al medico_id de respaldo ({self.medico_id})",
+                flush=True,
+            )
         print(
             f"  {estado} {exitosos}/{total} registros migrados"
             + (f"  ({len(errores)} errores)" if errores else ""),
             flush=True,
         )
         return {"exitosos": exitosos, "errores": errores, "total": total}
+
+    def _cargar_mapa_medicos(self) -> dict[str, int]:
+        """gesmed.points ya migrado → {NOMBRE_MEDICO_UPPER: id_medico}."""
+        mapa: dict[str, int] = {}
+        with Session(self._engine_destino) as s:
+            for row in s.execute(text("SELECT id_medico, nombre_medico FROM points")):
+                mapa[str(row.nombre_medico).strip().upper()] = row.id_medico
+        return mapa
 
     def _cargar_mapa_pacientes(self) -> dict[str, int]:
         """Descifra nombre_completo de amaymed.paciente → {NOMBRE_UPPER: nro_hclinica}."""

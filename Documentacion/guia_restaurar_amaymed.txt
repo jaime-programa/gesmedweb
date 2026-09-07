@@ -1,0 +1,163 @@
+========================================================================
+GUÍA — Subir/restituir la base de datos "amaymed" en MariaDB por terminal
+========================================================================
+Última actualización: 2026-09-06
+
+Objetivo: dejar una copia de la base "amaymed" (el sistema anterior a
+GesmedWeb) funcionando en este mismo servidor MariaDB, para que
+migrations/orquestador.py pueda leerla y migrar los datos hacia
+"gesmed". Este documento es independiente de guia_instalacion_
+servidor_nuevo.txt (sección 8) — ahí se explica cuándo y por qué se
+migra; aquí se explica solo el paso mecánico de subir el dump de
+amaymed a este servidor.
+
+Requisito previo: ya debes tener MariaDB instalado y con acceso de
+root funcionando (ver guia_mariadb_root_desde_cero.txt) y "gesmed" ya
+creada e instalada (ver guia_instalacion_servidor_nuevo.txt secciones
+2-6).
+
+------------------------------------------------------------------------
+1. CONSEGUIR EL ARCHIVO .sql DE AMAYMED
+------------------------------------------------------------------------
+Necesitas un dump COMPLETO (estructura + datos) de la base amaymed
+original, generado con mysqldump. Si todavía tienes acceso al servidor
+donde vive amaymed actualmente, generarlo ahí con:
+
+    mysqldump --routines --triggers \
+      -h localhost -u <usuario> -p amaymed > amaymed.sql
+
+(sin --no-data, a diferencia del dump de gesmed_estructura.sql — aquí
+SÍ quieres los datos, es lo que se va a migrar).
+
+Si ya tienes el archivo amaymed.sql en tu computador (por ejemplo,
+exportado antes desde XAMPP/phpMyAdmin en tu Mac), confirmá primero
+que es un dump real de mysqldump y no un export de phpMyAdmin — igual
+que con gesmed_estructura.sql, un export de phpMyAdmin puede fallar
+por FKs si el archivo no trae el wrapping de FOREIGN_KEY_CHECKS:
+
+    head -5 amaymed.sql
+
+Debe empezar con algo como "-- MySQL dump" o "-- MariaDB dump", NO con
+"-- phpMyAdmin SQL Dump". Y debe contener estas líneas (verificar con
+grep):
+
+    grep -n "FOREIGN_KEY_CHECKS" amaymed.sql
+
+Si el archivo es de phpMyAdmin y no las tiene, hay que regenerarlo con
+el CLI real de mysqldump en el equipo donde SÍ existe la base amaymed
+original.
+
+------------------------------------------------------------------------
+2. COPIAR EL ARCHIVO AL SERVIDOR
+------------------------------------------------------------------------
+Desde tu computador (Mac), hacia el servidor Mint:
+
+    scp amaymed.sql jaime@<ip-del-servidor>:/opt/gesmedweb/sql/
+
+(ajustar usuario/ip/ruta destino según corresponda; si el archivo pesa
+varios GB, este paso puede tardar bastante — es normal).
+
+Si el archivo viene comprimido (amaymed.sql.gz), copiarlo igual y
+descomprimir ya en el servidor:
+
+    gunzip /opt/gesmedweb/sql/amaymed.sql.gz
+
+------------------------------------------------------------------------
+3. CREAR LA BASE amaymed Y OTORGAR PERMISOS
+------------------------------------------------------------------------
+En el servidor, como root de MariaDB:
+
+    sudo mariadb
+
+Dentro del prompt:
+
+    CREATE DATABASE amaymed CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+    GRANT ALL PRIVILEGES ON amaymed.* TO 'med_admin'@'localhost';
+    FLUSH PRIVILEGES;
+    exit
+
+(Se reutiliza el mismo usuario med_admin que ya usa gesmed — no hace
+falta un usuario separado solo para leer amaymed en migración.)
+
+------------------------------------------------------------------------
+4. IMPORTAR EL DUMP (por terminal, NO por phpMyAdmin)
+------------------------------------------------------------------------
+    mysql -u med_admin -p amaymed < /opt/gesmedweb/sql/amaymed.sql
+
+IMPORTANTE: igual que con gesmed_estructura.sql, esta importación debe
+hacerse con el cliente "mysql" por línea de comandos. Importar por la
+interfaz web de phpMyAdmin puede fallar a mitad de camino sin avisar
+claramente (reintenta en varios "trozos" y puede perder el efecto de
+FOREIGN_KEY_CHECKS=0 entre trozos), dejando la base con tablas a medio
+crear — el síntoma típico es un error de "Table doesn't exist" mucho
+más adelante, al correr un script que sí necesita esa tabla.
+
+Confirmar el código de salida:
+
+    echo "EXIT CODE: $?"
+
+Debe ser 0. Si no lo es, mysql habrá impreso el error exacto justo
+antes — revisar ese mensaje antes de continuar.
+
+Si el archivo es muy grande y quieres ver progreso durante la
+importación, se puede usar "pv" (si está instalado):
+
+    sudo apt install -y pv
+    pv /opt/gesmedweb/sql/amaymed.sql | mysql -u med_admin -p amaymed
+
+------------------------------------------------------------------------
+5. VERIFICAR LA IMPORTACIÓN
+------------------------------------------------------------------------
+    mysql -u med_admin -p amaymed -e "SHOW TABLES;"
+
+Comparar la cantidad de tablas contra la base amaymed de origen (si
+tienes acceso a ella) para confirmar que no falta ninguna.
+
+Revisar también que haya datos reales, no solo estructura vacía, por
+ejemplo:
+
+    mysql -u med_admin -p amaymed -e "SELECT COUNT(*) FROM atencion;"
+    mysql -u med_admin -p amaymed -e "SELECT COUNT(*) FROM paciente;"
+
+(ajustar los nombres de tabla según lo que exista realmente en tu
+amaymed — estos son solo ejemplos habituales).
+
+------------------------------------------------------------------------
+6. AGREGAR LAS CREDENCIALES DE AMAYMED AL .env
+------------------------------------------------------------------------
+En /opt/gesmedweb/.env, agregar (si no estaban ya):
+
+    AMAYMED_DB_HOST=localhost
+    AMAYMED_DB_PORT=3306
+    AMAYMED_DB_USER=med_admin
+    AMAYMED_DB_PASSWORD=<la misma password de med_admin>
+    AMAYMED_DB_NAME=amaymed
+
+------------------------------------------------------------------------
+7. CONTINUAR CON LA MIGRACIÓN
+------------------------------------------------------------------------
+Con amaymed ya restituida en este servidor, seguir con la sección 8 de
+guia_instalacion_servidor_nuevo.txt, EN ESTE ORDEN:
+
+    8.3  migrations.migrador_medicos          (médicos → gesmed.points,
+         correr UNA vez, primero — obligatorio si amaymed tiene más de
+         un médico real, si no el orquestador no tiene con qué
+         atribuir correctamente cada atención/diagnóstico)
+    8.4  migrations.orquestador --medico-id <id-de-respaldo>
+         (correr UNA vez, no por médico — el <id> ya no es "el médico
+         de toda la tanda", es solo el ID de respaldo para registros
+         sin médico reconocible por nombre)
+    8.5  upsert_medicamento_presentacion
+    8.6  revisión del reporte final
+
+------------------------------------------------------------------------
+RESUMEN RÁPIDO
+------------------------------------------------------------------------
+1. Conseguir amaymed.sql real de mysqldump (no de phpMyAdmin)
+2. scp amaymed.sql al servidor, dentro de /opt/gesmedweb/sql/
+3. sudo mariadb → CREATE DATABASE amaymed; GRANT ALL ... TO med_admin
+4. mysql -u med_admin -p amaymed < sql/amaymed.sql   (por terminal)
+5. mysql -u med_admin -p amaymed -e "SHOW TABLES;"   (verificar)
+6. Agregar AMAYMED_DB_* al .env
+7. Continuar con migrations.orquestador (sección 8 de la guía principal)
+========================================================================

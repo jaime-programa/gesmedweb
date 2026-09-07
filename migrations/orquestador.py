@@ -63,7 +63,15 @@ def _amaymed_params() -> dict:
 
 class OrquestadorMigracion:
     """
-    Ejecuta la migración completa de un médico de amaymed a gesmed.
+    Ejecuta la migración completa de amaymed a gesmed (todos los médicos
+    y pacientes en una sola pasada — no es "un médico por corrida").
+
+    lk_medico en atencion/diagnostico se resuelve automáticamente
+    comparando el nombre del médico de amaymed contra gesmed.points
+    (deben migrarse antes con `migrations.migrador_medicos`). El
+    parámetro medico_id de esta clase es solo el ID de RESPALDO
+    (fallback) que se usa cuando un registro no tiene coincidencia
+    reconocible — no representa "el médico de toda la tanda".
 
     Orden de migración (respeta dependencias FK):
         paciente → diagnostico → prescripcion → (tablas futuras)
@@ -97,9 +105,16 @@ class OrquestadorMigracion:
         """
         inicio = time.time()
         print(f"\n{'═'*60}")
-        print(f"  MIGRACIÓN AMAYMED → GESMED   médico_id={self.medico_id}")
+        print(f"  MIGRACIÓN AMAYMED → GESMED   medico_id de respaldo={self.medico_id}")
         print(f"  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"{'═'*60}")
+
+        if not self._existe_medico_respaldo():
+            print(
+                f"  ✗ medico_id={self.medico_id} no existe en gesmed.points. "
+                f"Corra primero: .virtual/bin/python -m migrations.migrador_medicos"
+            )
+            return False
 
         # ── Paso 1: Backups ───────────────────────────────────────────────────
         print("\n[1/5] Backups automáticos...")
@@ -160,6 +175,24 @@ class OrquestadorMigracion:
         # ── Reporte final ─────────────────────────────────────────────────────
         self._imprimir_reporte(tiempo=time.time() - inicio, exito=exito_total)
         return exito_total
+
+    # ── Preflight ─────────────────────────────────────────────────────────────
+
+    def _existe_medico_respaldo(self) -> bool:
+        from sqlalchemy import create_engine, text
+        from sqlalchemy.orm import Session
+
+        url = os.environ.get(
+            "GESMED_DB_URL",
+            "mysql+pymysql://med_admin:gesmed01@localhost:3306/gesmed",
+        )
+        engine = create_engine(url, echo=False, pool_pre_ping=True)
+        with Session(engine) as s:
+            existe = s.execute(
+                text("SELECT 1 FROM points WHERE id_medico = :id"),
+                {"id": self.medico_id},
+            ).scalar_one_or_none()
+        return existe is not None
 
     # ── Backups ───────────────────────────────────────────────────────────────
 
@@ -329,7 +362,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Migración amaymed → gesmed")
     parser.add_argument(
         "--medico-id", type=int, default=1,
-        help="ID del médico (default: 1)"
+        help=(
+            "ID de respaldo (fallback) en gesmed.points, usado solo para "
+            "atencion/diagnostico cuyo médico de amaymed no se pudo "
+            "reconocer por nombre. Debe existir ya en points — correr antes "
+            "migrations.migrador_medicos para migrar los médicos reales. "
+            "(default: 1)"
+        )
     )
     args = parser.parse_args()
 

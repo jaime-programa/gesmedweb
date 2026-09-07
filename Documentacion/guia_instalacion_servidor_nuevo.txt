@@ -1,7 +1,7 @@
 ========================================================================
 GUÍA DE INSTALACIÓN — GesmedWeb en un servidor nuevo (Ubuntu 26.04)
 ========================================================================
-Última actualización: 2026-09-04
+Última actualización: 2026-09-06
 
 Esta guía instala GesmedWeb desde cero en un servidor limpio, usando:
   - Dump de ESTRUCTURA (no create_all() de SQLModel) para regenerar el
@@ -46,7 +46,43 @@ Desde tu gesmed local (o el servidor de referencia), generar un dump
 SOLO de estructura (sin datos de pacientes reales):
 
     mysqldump --no-data --routines --triggers \
+      --ignore-table=gesmed.atencion_amaymed \
+      --ignore-table=gesmed.atencion_amaymed_gesmed \
+      --ignore-table=gesmed.diagnostico_amaymed \
+      --ignore-table=gesmed.diagnostico_amaymed_gesmed \
       -h localhost -u med_admin -p gesmed > sql/gesmed_estructura.sql
+
+IMPORTANTE — usar el binario real de "mysqldump" (CLI), NO el export
+web de phpMyAdmin. El export de phpMyAdmin no incluye el wrapping
+"SET FOREIGN_KEY_CHECKS=0/1" que mysqldump sí agrega automáticamente,
+y sin eso la creación de tablas puede fallar según el orden en que
+aparecen en el archivo, con un error como:
+
+    ERROR 1005 (HY000): Can't create table `gesmed`.`<tabla>`
+    (errno: 150 "Foreign key constraint is incorrectly formed")
+
+Si "mysqldump" no está en el PATH (p.ej. en Mac con XAMPP), usar la
+ruta completa al binario, por ejemplo:
+"/Applications/XAMPP/xamppfiles/bin/mysqldump".
+
+Los 4 "--ignore-table" excluyen vistas de comparación/depuración que
+solo existen en el entorno de desarrollo (atencion_amaymed,
+atencion_amaymed_gesmed, diagnostico_amaymed, diagnostico_amaymed_gesmed),
+usadas históricamente para comparar registros entre amaymed y gesmed
+durante la migración. Estas vistas consultan directamente la base
+"amaymed", y si se incluyen en el dump, la instalación falla en un
+servidor donde amaymed no existe o no es accesible con un error como:
+
+    ERROR 1142 (42000): ANY command denied to user 'med_admin'@'localhost'
+    for table `amaymed`.`atencion`
+
+El artefacto de instalación (gesmed_estructura.sql) NO debe contener
+ninguna referencia a "amaymed" — puedes confirmarlo con:
+
+    grep -i amaymed sql/gesmed_estructura.sql   # no debe imprimir nada
+
+(Las vistas siguen existiendo normalmente en tu gesmed local de
+desarrollo; solo se excluyen de este dump de instalación.)
 
 Importante: sql/gesmed.sql (el dump completo actual del repo) NO sirve
 para esto tal cual — contiene datos reales de pacientes (paciente,
@@ -59,6 +95,18 @@ Copiar el archivo al servidor nuevo y aplicarlo:
 
     mysql -u med_admin -p gesmed < sql/gesmed_estructura.sql
 
+Si una aplicación anterior falló a mitad de camino (BD con tablas a
+medias) y hay que reintentar, es más seguro recrear la BD vacía antes
+de reaplicar el dump corregido:
+
+    sudo mysql -e "
+      DROP DATABASE gesmed;
+      CREATE DATABASE gesmed CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+      GRANT ALL PRIVILEGES ON gesmed.* TO 'med_admin'@'localhost';
+      FLUSH PRIVILEGES;
+    "
+    mysql -u med_admin -p gesmed < sql/gesmed_estructura.sql
+
 ------------------------------------------------------------------------
 4. CÓDIGO + ENTORNO PYTHON
 ------------------------------------------------------------------------
@@ -66,6 +114,28 @@ git clone <tu-repo> /opt/gesmedweb   # o rsync si no se usa git
 cd /opt/gesmedweb
 python3 -m venv .virtual
 .virtual/bin/pip install -r requirements.txt
+
+IMPORTANTE — permisos en /opt: crear /opt/gesmedweb normalmente requiere
+sudo, lo que deja el directorio (incluido .git) con dueño root mientras
+el usuario normal (p.ej. "jaime") es quien corre git/python después.
+Esto causa, típicamente al hacer "git pull" más adelante:
+
+    fatal: detected dubious ownership in repository at '/opt/gesmedweb'
+
+La solución correcta es cambiar el dueño del directorio al usuario que
+lo va a operar, NO solo silenciar el aviso de git:
+
+    sudo chown -R <tu-usuario>:<tu-usuario> /opt/gesmedweb
+
+Usar únicamente "git config --global --add safe.directory /opt/gesmedweb"
+sin el chown solo apaga la advertencia de "dubious ownership", pero los
+archivos siguen siendo de root y no escribibles por el usuario normal —
+el siguiente "git pull" falla igual, con un error distinto:
+
+    error: no se puede abrir '.git/FETCH_HEAD': Permiso denegado
+
+Si esto ya ocurrió, aplicar el chown de arriba resuelve ambos errores
+de una vez (no hace falta clonar de nuevo).
 
 ------------------------------------------------------------------------
 5. VARIABLES DE ENTORNO (.env)
@@ -91,6 +161,15 @@ Crear el archivo .env en la raíz del proyecto:
     GESMED_DB_NAME=gesmed
 
 (GEODATA_DB_URL ya no es necesaria — se puede omitir del .env.)
+
+NOTA sobre carga de .env: todos los scripts en migrations/ (parametros_
+fijos.py, orquestador.py, crear_admin_inicial.py, verificar_estructura.py,
+upsert_medicamento_presentacion.py) cargan el .env automáticamente con
+python-dotenv (load_dotenv), así que ejecutarlos con
+"python -m migrations.<script>" SÍ lee las variables definidas arriba.
+requirements.txt ya incluye python-dotenv — no hace falta instalarlo
+aparte, solo asegurarse de correr "pip install -r requirements.txt"
+(paso 4) antes de estos scripts.
 
 CRÍTICO: si este servidor va a recibir datos migrados desde amaymed
 (paciente, diagnostico, prescripcion — todos con campos cifrados
@@ -142,23 +221,66 @@ nuevo debe quedar con los datos clínicos migrados desde amaymed
     (Estas variables tienen fallback a los valores por defecto vistos en
     migrations/orquestador.py, pero es mejor declararlas explícitamente.)
 
-8.3 Ejecutar el orquestador de migración, uno por cada médico a migrar:
+8.3 Migrar primero las cuentas de los médicos (amaymed.medico → gesmed.
+    points). Esto es obligatorio ANTES del orquestador: si amaymed tiene
+    más de un médico registrado y solo existe la cuenta ADMIN (creada
+    por crear_admin_inicial.py, que no es un médico), el orquestador no
+    tiene con qué atribuir correctamente atencion/diagnostico a cada
+    médico real.
+
+    .virtual/bin/python -m migrations.migrador_medicos
+
+    Qué hace (ver migrations/migrador_medicos.py):
+      - Crea una fila en gesmed.points por cada médico de amaymed.medico
+        que no exista ya (comparando por `usuario`); es idempotente, se
+        puede volver a correr sin duplicar.
+      - amaymed.medico no tiene id numérico (su PK es el nombre en
+        texto), así que cada médico migrado recibe un id_medico NUEVO
+        por AUTO_INCREMENT — no existe un id original que "conservar".
+      - La contraseña de amaymed es texto plano y nunca se reutiliza: se
+        genera una contraseña temporal aleatoria por médico, se guarda
+        hasheada con bcrypt, y se imprime UNA SOLA VEZ en pantalla (no
+        queda en ningún archivo ni log) para entregarla por un canal
+        seguro y pedir el cambio en el primer ingreso.
+      - Anotar los id_medico impresos al final — sirven para verificar
+        la atribución de datos migrados en el paso 8.4.
+
+8.4 Ejecutar el orquestador de migración de datos clínicos:
 
     .virtual/bin/python -m migrations.orquestador --medico-id <id>
 
+    IMPORTANTE — esto migra TODOS los pacientes y TODOS los médicos de
+    amaymed en una sola pasada, no es "uno por médico": el orquestador
+    trunca y reconstruye las tablas destino completas en cada corrida
+    (ver migrations/orquestador.py), así que NO debe repetirse una vez
+    por médico — se corre una sola vez.
+
+    El <id> de --medico-id ya NO significa "el médico de toda la
+    tanda": es solo el ID de RESPALDO (fallback) que se usa para las
+    pocas atenciones/diagnósticos cuyo médico en amaymed no se pudo
+    reconocer por nombre contra gesmed.points (por ejemplo, un nombre
+    escrito distinto entre medico_atiende y medico.nombre_medico). Debe
+    ser un id_medico que YA exista en gesmed.points — usar uno de los
+    creados en el paso 8.3. Si no existe, el orquestador se detiene
+    antes de tocar nada y lo indica explícitamente.
+
     Esto hace, en un solo proceso (ver migrations/orquestador.py):
       1. Backup automático de amaymed y gesmed antes de tocar nada
-      2. Aplica los ALTER TABLE necesarios (columnas a BLOB para cifrado)
-      3. Trunca las tablas destino en gesmed (orden inverso de FK)
-      4. Migra tabla por tabla en orden de dependencias FK:
+      2. Verifica que el medico_id de respaldo exista en gesmed.points
+      3. Aplica los ALTER TABLE necesarios (columnas a BLOB para cifrado)
+      4. Trunca las tablas destino en gesmed (orden inverso de FK)
+      5. Migra tabla por tabla en orden de dependencias FK, resolviendo
+         lk_medico en atencion/diagnostico por nombre contra los
+         médicos ya migrados en 8.3 (cae al id de respaldo solo si no
+         hay coincidencia):
          paciente → diagnostico → atencion → rel_atencion_diagnostico →
          prescripcion → prescripcion_cuidados → certificado →
          examenes_grupo → examenes_catalogo → examenes_pedido →
          pedido_imagen
-      5. Verifica conteos origen vs destino por tabla
-      6. Reporte final; si algo falla, no continúa a ciegas
+      6. Verifica conteos origen vs destino por tabla
+      7. Reporte final; si algo falla, no continúa a ciegas
 
-8.4 Upsert de tablas no cubiertas por el orquestador (si aplica):
+8.5 Upsert de tablas no cubiertas por el orquestador (si aplica):
 
     .virtual/bin/python -m migrations.upsert_medicamento_presentacion
 
@@ -166,9 +288,12 @@ nuevo debe quedar con los datos clínicos migrados desde amaymed
     upsert por id_presentacion — ver el docstring del script antes de
     correrlo, sobrescribe destino por id)
 
-8.5 Revisar el reporte final del orquestador (conteos origen/destino
+8.6 Revisar el reporte final del orquestador (conteos origen/destino
     por tabla) y los errores impresos por consola antes de dar la
-    migración por buena. Repetir 8.3 por cada médico si hay más de uno.
+    migración por buena. Prestar atención especial a las advertencias
+    "sin medico_atiende/medico_diagnostica reconocido" — indican
+    registros que cayeron al médico de respaldo y conviene revisar
+    manualmente cuál era el médico correcto.
 
 ------------------------------------------------------------------------
 9. LEVANTAR LA APP
@@ -296,13 +421,20 @@ RESUMEN DE ORDEN DE EJECUCIÓN
 1. apt install (sistema + mariadb + node)
 2. crear BD gesmed + usuario med_admin
 3. mysql gesmed < gesmed_estructura.sql
+   (generado con mysqldump real, excluyendo vistas *_amaymed*)
 4. git clone + venv + pip install -r requirements.txt
+   (si /opt requiere sudo: sudo chown -R <usuario>:<usuario> /opt/gesmedweb)
 5. crear .env (GESMED_MASTER_KEY, GESMED_DB_URL)
 6. python -m migrations.parametros_fijos --instalar
 7. python -m migrations.crear_admin_inicial --usuario ...
 8. python -m migrations.verificar_estructura   (opcional, para confirmar)
-9. [solo si se restituye desde amaymed] python -m migrations.orquestador
-   --medico-id <id>  (repetir por médico) + upsert_medicamento_presentacion
+9. [solo si se restituye desde amaymed]
+   9a. python -m migrations.migrador_medicos   (médicos → gesmed.points,
+       correr UNA vez, obligatorio antes del orquestador si hay más de
+       un médico real en amaymed)
+   9b. python -m migrations.orquestador --medico-id <id-de-respaldo>
+       (correr UNA vez, no por médico — <id> es solo el fallback para
+       registros sin médico reconocible) + upsert_medicamento_presentacion
 10. reflex init && reflex run --env prod
 11. WireGuard: instalar, generar claves, configurar wg0.conf en ambos
     lados, restringir ufw y bind-address de MariaDB a la VPN
