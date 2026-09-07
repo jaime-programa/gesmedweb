@@ -4959,6 +4959,12 @@ class ResultadosState(AtencionState):
         3. Asignar imágenes    → ri_abrir_asignar() → ri_confirmar_asignar()
            o crear nuevo       → ri_crear_y_asignar()
         4. Análisis            → ri_seleccionar_imagen() (panel Fase 3)
+
+    Atención destino del upload (ri_procesar_upload/ri_recargar): soap_id_atencion
+    si hay una atención en curso abierta; si no, cae a id_atencion_seleccionada
+    (la fila resaltada en tabla_historial_atenciones). Esto último es lo que
+    permite subir imágenes para pacientes migrados desde amaymed que solo
+    tienen atenciones históricas y ninguna "en curso" creada en gesmed.
     """
 
     # ── Visibilidad ─────────────────────────────────────────────────────────
@@ -5100,7 +5106,11 @@ class ResultadosState(AtencionState):
 
     def ri_recargar(self):
         nro   = self.nro_hclinica_seleccionado
-        lk_at = self.soap_id_atencion
+        # soap_id_atencion (atención en curso) si hay una abierta; si no, la
+        # atención histórica resaltada en tabla_historial_atenciones — necesario
+        # para pacientes migrados que solo tienen atenciones antiguas, sin
+        # ninguna "en curso" (ver ri_procesar_upload).
+        lk_at = self.soap_id_atencion or self.id_atencion_seleccionada
         if nro <= 0:
             return
         with Session(engine) as session:
@@ -5139,9 +5149,13 @@ class ResultadosState(AtencionState):
         self.ri_upload_error = ""
         yield                           # envía ri_subiendo=True al frontend ANTES de procesar
         nro   = self.nro_hclinica_seleccionado
-        lk_at = self.soap_id_atencion
+        # soap_id_atencion (atención en curso) si hay una abierta; si no, la
+        # atención histórica resaltada en tabla_historial_atenciones — permite
+        # subir imágenes de pacientes migrados que solo tienen atenciones
+        # antiguas (sin ninguna "en curso" creada todavía en gesmed).
+        lk_at = self.soap_id_atencion or self.id_atencion_seleccionada
         if nro <= 0 or lk_at <= 0:
-            self.ri_upload_error = "No hay paciente o atención activa."
+            self.ri_upload_error = "No hay paciente o atención (actual o histórica seleccionada)."
             self.ri_subiendo = False
             return
         try:
