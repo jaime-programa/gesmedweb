@@ -99,8 +99,8 @@ def muestra_pacientes():
                         ),
                         rx.cond(
                             State.hay_paciente_seleccionado,
-                            rx.button('Nueva Atención', on_click=State.carga_atenciones),
-                            rx.button('Nueva Atención', disabled=True),
+                            rx.button('Historia Clínica', on_click=State.carga_atenciones),
+                            rx.button('Historia Clínica', disabled=True),
                         ),
                         rx.button(
                             rx.icon("calendar-days", size=15),
