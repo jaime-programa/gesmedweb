@@ -201,6 +201,18 @@ def _dlg_nuevo() -> rx.Component:
                            )),
                     spacing="3", width="100%",
                 ),
+                _campo("Alcance de pacientes *",
+                       rx.select.root(
+                           rx.select.trigger(width="100%"),
+                           rx.select.content(
+                               rx.select.item("Ve y modifica todos los pacientes", value="TT"),
+                               rx.select.item("Ve y modifica solo sus propios pacientes", value="PP"),
+                               rx.select.item("Ve todos, pero modifica solo sus propios", value="TP"),
+                           ),
+                           value=AdminUsuariosState.au_n_perfil_alcance,
+                           on_change=AdminUsuariosState.set_au_n_perfil_alcance,
+                           size="2",
+                       )),
                 # Fila 4: Contraseñas
                 rx.hstack(
                     _campo("Contraseña *",
@@ -296,6 +308,18 @@ def _dlg_editar() -> rx.Component:
                            )),
                     spacing="3", width="100%",
                 ),
+                _campo("Alcance de pacientes *",
+                       rx.select.root(
+                           rx.select.trigger(width="100%"),
+                           rx.select.content(
+                               rx.select.item("Ve y modifica todos los pacientes", value="TT"),
+                               rx.select.item("Ve y modifica solo sus propios pacientes", value="PP"),
+                               rx.select.item("Ve todos, pero modifica solo sus propios", value="TP"),
+                           ),
+                           value=AdminUsuariosState.au_e_perfil_alcance,
+                           on_change=AdminUsuariosState.set_au_e_perfil_alcance,
+                           size="2",
+                       )),
                 # Estado activo/inactivo en el form de edición
                 rx.hstack(
                     rx.text("Estado:", font_size="12px", font_weight="600",

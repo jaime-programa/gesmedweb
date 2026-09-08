@@ -10,6 +10,7 @@ from ..componentes.componentes import (
     panel_historia_atencion,
     panel_historial_prescripciones,
 )
+from ..componentes.colores import PACIENTE_AJENO_ATENCION_COLOR, PACIENTE_DISPONIBLE_ATENCION_COLOR
 from ..componentes.dialogos import (
     offcanvas_atencion, offcanvas_prescripcion, offcanvas_nuevo_diagnostico,
     offcanvas_pedido_examenes, offcanvas_resultados_examenes,
@@ -76,7 +77,16 @@ def navbar():
                         # Historia Clinica
                         rx.text('# ', State.paciente_seleccionado[0], font_weight="bold", font_size="12px"),
                         # Nombre Paciente
-                        rx.text(State.paciente_seleccionado[1], font_weight="bold", font_size="12px"),
+                        rx.text(
+                            State.paciente_seleccionado[1], font_weight="bold", font_size="12px",
+                            color=rx.cond(
+                                State.paciente_actual_disponible,
+                                PACIENTE_DISPONIBLE_ATENCION_COLOR,
+                                rx.cond(
+                                    State.paciente_actual_es_propio, "inherit", PACIENTE_AJENO_ATENCION_COLOR
+                                ),
+                            ),
+                        ),
                         # Edad
                         rx.badge(State.paciente_seleccionado[2], variant="surface", font_size="12px"),
                         # Fecha Nacimiento
@@ -115,7 +125,7 @@ def navbar():
                 # Grupo central — contenedor posicionado al 50% del navbar
                 rx.box(
                     rx.cond(
-                        State.puede_escribir,
+                        State.puede_escribir_paciente_actual,
                         rx.cond(
                             AtencionState.atencion_iniciada,
                             # ── Botones SOAP / Prescripción / Exámenes ────────────

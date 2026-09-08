@@ -46,7 +46,7 @@ from .utils.imagen_utils import (
     leer_imagen          as img_leer,
 )
 from .querys.querys import (
-    connect, consultar_pacientes_por_nombre, historial_atenciones_con_cie10,
+    connect, consultar_pacientes_por_nombre, estado_propiedad_paciente, historial_atenciones_con_cie10,
     c1, historial_diagnosticos, atenciones_vinculadas_a_diagnostico,
     diagnosticos_vinculados_a_atencion, carga_medicos, carga_seguros,
     buscar_medicamentos, listar_presentaciones, listar_alergias_paciente,
@@ -96,8 +96,12 @@ class State(rx.State):
     px2:str=''  #password
     que_paciente_busco: str =''
     lista_pacientes: list[dict]=[]
+    pac_orden_col: str = ""
+    pac_orden_asc: bool = True
     lista_medicos: dict={}
     paciente_seleccionado: list = []
+    paciente_actual_es_propio: bool = True
+    paciente_actual_disponible: bool = False
     diagnostico_seleccionado: list = []
     atencion_seleccionada: list = []
     celda_pacientes: dict = {"row": None, "column": None}
@@ -258,6 +262,36 @@ class State(rx.State):
     def puede_config_reportes(self) -> bool:
         return len(self.permisos) > 0 and self.permisos[0] == "R"
 
+    @rx.var
+    def ve_solo_propios_pacientes(self) -> bool:
+        """permisos[1]: alcance de LECTURA. 'P' = solo pacientes propios (con
+        atención del médico logueado), 'T' o ausente = todos (comportamiento previo)."""
+        return len(self.permisos) > 1 and self.permisos[1] == "P"
+
+    @rx.var
+    def edita_solo_propios_pacientes(self) -> bool:
+        """permisos[2]: alcance de ESCRITURA. 'P' = solo puede modificar pacientes
+        propios (aunque pueda leer otros si permisos[1] == 'T'), 'T' o ausente =
+        modifica cualquier paciente (comportamiento previo)."""
+        return len(self.permisos) > 2 and self.permisos[2] == "P"
+
+    @rx.var
+    def paciente_actual_ajeno(self) -> bool:
+        """True cuando el paciente actual es ajeno (sin atención propia del
+        médico logueado, y con al menos una atención de otro médico)."""
+        return not self.paciente_actual_es_propio
+
+    @rx.var
+    def resultados_deshabilitado_por_ajeno(self) -> bool:
+        """Para el panel Resultado_imagenes: los botones 'Subir archivos' y
+        'Laboratorio' se deshabilitan solo cuando el paciente es ajeno Y el
+        perfil del médico restringe la escritura a sus propios pacientes
+        (permisos[2] == 'P', perfil 3 'T/P'). En perfil 1 (T/T) los botones
+        quedan habilitados aunque el paciente sea ajeno, porque ese perfil
+        puede modificar cualquier paciente. En perfil 2 (P/P) no aplica en
+        la práctica, ya que ese perfil ni siquiera ve pacientes ajenos."""
+        return self.edita_solo_propios_pacientes and self.paciente_actual_ajeno
+
     # ── Control de perfiles ───────────────────────────────────────────────────
     # Perfiles: SECRETARIA | MEDICO_CONSULTA | MEDICO_ATENCION | ADMIN
 
@@ -286,6 +320,16 @@ class State(rx.State):
     def puede_escribir(self) -> bool:
         """Solo Med.Prop y Admin pueden crear/modificar registros clínicos."""
         return self.rol_usuario in ["MEDICO_ATENCION", "ADMIN"]
+
+    @rx.var
+    def puede_escribir_paciente_actual(self) -> bool:
+        """puede_escribir (rol) + respeta el alcance de escritura (permisos[2])
+        sobre el paciente actualmente cargado. paciente_actual_es_propio se
+        calcula una sola vez, al seleccionar el paciente (no en cada acceso),
+        para no repetir la consulta a Atencion en cada render."""
+        return self.puede_escribir and (
+            not self.edita_solo_propios_pacientes or self.paciente_actual_es_propio
+        )
 
     @rx.var
     def puede_admin(self) -> bool:
@@ -394,6 +438,28 @@ class State(rx.State):
         return self.lista_pacientes
 
     @rx.var
+    def lista_pacientes_ordenada(self) -> list[dict]:
+        rows = self.lista_pacientes
+        col = self.pac_orden_col
+        if not col:
+            return rows
+        def _key(p):
+            v = p.get(col)
+            if v is None:
+                return (1, "")
+            if isinstance(v, str):
+                return (0, v.lower())
+            return (0, v)
+        return sorted(rows, key=_key, reverse=not self.pac_orden_asc)
+
+    def pac_toggle_orden(self, col: str):
+        if self.pac_orden_col == col:
+            self.pac_orden_asc = not self.pac_orden_asc
+        else:
+            self.pac_orden_col = col
+            self.pac_orden_asc = True
+
+    @rx.var
     def lista_pacientes_rows(self) -> list[list]:
         return [
             [p.get('nro_hclinica',''), p.get('nombre_completo',''), p.get('edad',''),
@@ -422,21 +488,43 @@ class State(rx.State):
 
     def carga_pacientes_filtrados(self):
         with Session(engine) as session:
-            self.lista_pacientes=consultar_pacientes_por_nombre(session,self.que_paciente_busco,self.id_medico)
+            self.lista_pacientes=consultar_pacientes_por_nombre(session,self.que_paciente_busco,self.id_medico,self.ve_solo_propios_pacientes)
+
+    def _autoriza_y_selecciona_paciente(self, datos: list) -> bool:
+        """Fija paciente_seleccionado tras verificar el alcance de lectura
+        (permisos[1]) contra el paciente puntual — no solo confiar en que la
+        búsqueda ya lo haya filtrado, ya que un médico puede llegar a un
+        paciente por otra vía (agenda, selección directa, etc.). También
+        cachea paciente_actual_es_propio/paciente_actual_disponible para que
+        puede_escribir_paciente_actual y la UI no repitan la consulta a
+        Atencion en cada acceso.
+
+        Un paciente sin ninguna atención registrada (de ningún médico) está
+        "disponible": aún no tiene dueño, así que se trata como accesible
+        para cualquier médico (puede verlo y registrarle su primera
+        atención), sin importar su alcance de lectura/escritura."""
+        nro_hclinica = datos[0]
+        with Session(engine) as session:
+            accesible, disponible = estado_propiedad_paciente(session, nro_hclinica, self.id_medico)
+        if self.ve_solo_propios_pacientes and not accesible:
+            return False
+        self.paciente_seleccionado = datos
+        self.paciente_actual_es_propio = accesible
+        self.paciente_actual_disponible = disponible
+        self.contenido_derecha = ""
+        return True
 
     def click_tabla_pacientes(self, cell_data: Tuple):
         self.celda_pacientes = {
             "row": cell_data[1],
             "column": cell_data[0]
         }
-        self.paciente_seleccionado=[self.lista_pacientes[self.celda_pacientes['row']]['nro_hclinica'],
-                                    self.lista_pacientes[self.celda_pacientes['row']]['nombre_completo'],
-                                    self.lista_pacientes[self.celda_pacientes['row']]['edad'],
-                                    self.lista_pacientes[self.celda_pacientes['row']]['fecha_nacimiento'],
-                                    self.lista_pacientes[self.celda_pacientes['row']]['grupo_sanguineo'],
-                                    self.lista_pacientes[self.celda_pacientes['row']]['seguro']]
-        print (self.paciente_seleccionado[1])
-        self.contenido_derecha=""
+        fila = self.lista_pacientes[self.celda_pacientes['row']]
+        datos = [fila['nro_hclinica'], fila['nombre_completo'], fila['edad'],
+                 fila['fecha_nacimiento'], fila['grupo_sanguineo'], fila['seguro']]
+        if not self._autoriza_y_selecciona_paciente(datos):
+            yield rx.toast.error("No tiene permiso para acceder a este paciente.")
+            return
         yield AtencionState.reinicia_soap
         #self.diagnostico_seleccionado.clear
 
@@ -775,7 +863,7 @@ class State(rx.State):
     def selecciona_paciente(self, nro_hclinica: int):
         for p in self.lista_pacientes:
             if p.get('nro_hclinica') == nro_hclinica:
-                self.paciente_seleccionado = [
+                datos = [
                     p['nro_hclinica'],
                     p['nombre_completo'],
                     p.get('edad', ''),
@@ -783,7 +871,8 @@ class State(rx.State):
                     p.get('grupo_sanguineo', ''),
                     p.get('seguro', '')
                 ]
-                self.contenido_derecha = ""
+                if not self._autoriza_y_selecciona_paciente(datos):
+                    yield rx.toast.error("No tiene permiso para acceder a este paciente.")
                 break
 
     def selecciona_diagnostico(self, id_diagnostico: int):
@@ -881,7 +970,7 @@ class AtencionState(State):
         self.offcanvas_menu = not self.offcanvas_menu
 
     def iniciar_nueva_atencion(self):
-        if not self.puede_escribir:
+        if not self.puede_escribir_paciente_actual:
             return
         self.atencion_iniciada = True
 
@@ -889,7 +978,7 @@ class AtencionState(State):
         self.atencion_iniciada = False
 
     def editar_atencion_historica(self):
-        if not self.puede_escribir:
+        if not self.puede_escribir_paciente_actual:
             return
         if not self.atencion_seleccionada or len(self.atencion_seleccionada) < 8:
             return
@@ -1170,7 +1259,7 @@ class AtencionState(State):
         self.vd_error = ""
 
     def confirmar_vinculos(self):
-        if not self.puede_escribir:
+        if not self.puede_escribir_paciente_actual:
             return
         if not self.vd_seleccionados:
             self.vd_error = "Seleccione al menos un diagnóstico."
@@ -1388,7 +1477,7 @@ class AtencionState(State):
         self.soap_modo_edicion = True
 
     def guardar_cambios_soap(self):
-        if not self.puede_escribir:
+        if not self.puede_escribir_paciente_actual:
             return
         if not self.soap_id_atencion:
             return
@@ -1834,7 +1923,7 @@ class NuevoDiagnosticoState(State):
         self.nd_error = ""
 
     def guardar_diagnostico(self):
-        if not self.puede_escribir:
+        if not self.puede_escribir_paciente_actual:
             return
         if not self.nd_cie10.strip():
             self.nd_error = "Seleccione un diagnóstico CIE10 de la tabla de búsqueda."
@@ -2214,7 +2303,7 @@ class PrescripcionState(State):
 
     def agregar_item(self):
         """Valida, encripta y guarda un ítem de prescripción."""
-        if not self.puede_escribir:
+        if not self.puede_escribir_paciente_actual:
             return
         if not self.px_puede_agregar:
             self.px_form_error = "Complete medicamento, concentración, cantidad e indicaciones."
@@ -2243,7 +2332,7 @@ class PrescripcionState(State):
             self.px_form_error = f"Error al guardar: {str(e)}"
 
     def eliminar_item(self, id_prescripcion: int):
-        if not self.puede_escribir:
+        if not self.puede_escribir_paciente_actual:
             return
         with Session(engine) as session:
             eliminar_item_prescripcion(session, id_prescripcion)
@@ -2257,7 +2346,7 @@ class PrescripcionState(State):
         self.px_cuidados_generales = v
 
     def guardar_cuidados(self):
-        if not self.puede_escribir:
+        if not self.puede_escribir_paciente_actual:
             return
         if not self.px_id_atencion:
             return
@@ -2328,7 +2417,7 @@ class PrescripcionState(State):
 
     def grabar_prescripcion(self):
         """Guarda cuidados y bloquea el formulario."""
-        if not self.puede_escribir:
+        if not self.puede_escribir_paciente_actual:
             return
         if self.px_id_atencion:
             try:
@@ -2352,7 +2441,7 @@ class PrescripcionState(State):
 
     def guardar_cambios_prescripcion(self):
         """Guarda cuidados y vuelve a bloquear."""
-        if not self.puede_escribir:
+        if not self.puede_escribir_paciente_actual:
             return
         if self.px_id_atencion:
             try:
@@ -2406,7 +2495,7 @@ class PrescripcionState(State):
 
     def guardar_edicion_item(self):
         """Valida y persiste los cambios del ítem en edición."""
-        if not self.puede_escribir:
+        if not self.puede_escribir_paciente_actual:
             return
         if not self.px_edit_concentracion.strip() or not self.px_edit_indicaciones.strip():
             self.px_edit_error = "Concentración e indicaciones son obligatorias."
@@ -2592,7 +2681,7 @@ class NuevoAntFamiliarState(State):
     def set_naf_descripcion(self, v: str):    self.naf_descripcion    = v
 
     def guardar_naf(self):
-        if not self.puede_escribir:
+        if not self.puede_escribir_paciente_actual:
             return
         if not self.naf_descripcion.strip():
             self.naf_error = "La descripción es obligatoria."
@@ -3261,7 +3350,7 @@ class NuevaAlergiaState(State):
     def set_naa_sustancia(self, v: str):    self.naa_sustancia   = v
 
     def guardar_naa(self):
-        if not self.puede_escribir:
+        if not self.puede_escribir_paciente_actual:
             return
         if not self.naa_sustancia.strip():
             self.naa_error = "La sustancia es obligatoria."
@@ -4747,7 +4836,7 @@ class AgendaState(State):
 
     def _ag_buscar_pacientes(self, filtro: str):
         resultados = consultar_pacientes_por_nombre(
-            Session(engine), filtro, self.id_medico
+            Session(engine), filtro, self.id_medico, self.ve_solo_propios_pacientes
         )
         self.ag_nc_resultados_px = [
             {"id": r["nro_hclinica"], "nombre": r["nombre_completo"]}
@@ -5143,7 +5232,7 @@ class ResultadosState(AtencionState):
     # ── Upload ───────────────────────────────────────────────────────────────
 
     async def ri_procesar_upload(self, files: list[rx.UploadFile]):
-        if not self.puede_escribir:
+        if not self.puede_escribir_paciente_actual:
             return
         self.ri_subiendo     = True
         self.ri_upload_error = ""
@@ -5418,7 +5507,7 @@ class ResultadosState(AtencionState):
         self.ri_nv_payload = ""
 
     def ri_guardar_nueva_marca(self):
-        if not self.puede_escribir:
+        if not self.puede_escribir_paciente_actual:
             return
         with Session(engine) as s:
             rq_guardar_marca(
@@ -5441,7 +5530,7 @@ class ResultadosState(AtencionState):
         self.ri_nv_payload = ""
 
     def ri_eliminar_marca_item(self, id_marca: int):
-        if not self.puede_escribir:
+        if not self.puede_escribir_paciente_actual:
             return
         with Session(engine) as s:
             rq_eliminar_marca(s, id_marca)
@@ -5462,7 +5551,7 @@ class ResultadosState(AtencionState):
         self.ri_edit_id   = 0
 
     def ri_guardar_edicion_marca(self):
-        if not self.puede_escribir:
+        if not self.puede_escribir_paciente_actual:
             return
         with Session(engine) as s:
             rq_actualizar_marca(s, self.ri_edit_id,
@@ -5602,12 +5691,12 @@ class LaboratorioState(AtencionState):
         self.lab_error    = ""
 
     def lab_agregar_fila(self):
-        if not self.puede_escribir:
+        if not self.puede_escribir_paciente_actual:
             return
         self.lab_filas = self.lab_filas + [self._nueva_fila()]
 
     def lab_eliminar_fila(self, fila_id: int):
-        if not self.puede_escribir:
+        if not self.puede_escribir_paciente_actual:
             return
         self.lab_filas = [f for f in self.lab_filas if f["fila_id"] != fila_id]
 
@@ -5644,7 +5733,7 @@ class LaboratorioState(AtencionState):
         ]
 
     def lab_guardar(self):
-        if not self.puede_escribir:
+        if not self.puede_escribir_paciente_actual:
             return
         import datetime as _dt
         nro = self.nro_hclinica_seleccionado
@@ -5986,6 +6075,9 @@ class AdminUsuariosState(State):
     au_n_clave: str = ""
     au_n_clave2: str = ""
     au_n_rol: str = "MEDICO_ATENCION"
+    # Perfil de alcance de pacientes ("TT"=ve y modifica todos, "PP"=ve y
+    # modifica solo propios, "TP"=ve todos pero modifica solo propios).
+    au_n_perfil_alcance: str = "TT"
 
     # Formulario: editar usuario
     au_e_nombre: str = ""
@@ -5996,6 +6088,7 @@ class AdminUsuariosState(State):
     au_e_usuario: str = ""
     au_e_rol: str = "MEDICO_ATENCION"
     au_e_estado: int = 1
+    au_e_perfil_alcance: str = "TT"
 
     # Formulario: resetear contraseña
     au_p_id: int = 0
@@ -6026,6 +6119,7 @@ class AdminUsuariosState(State):
     def set_au_n_clave(self, v: str):        self.au_n_clave       = v
     def set_au_n_clave2(self, v: str):       self.au_n_clave2      = v
     def set_au_n_rol(self, v: str):          self.au_n_rol         = v
+    def set_au_n_perfil_alcance(self, v: str): self.au_n_perfil_alcance = v
 
     # ── Setters para formulario editar ────────────────────────────────────────
     def set_au_e_nombre(self, v: str):       self.au_e_nombre      = v
@@ -6035,6 +6129,7 @@ class AdminUsuariosState(State):
     def set_au_e_email(self, v: str):        self.au_e_email       = v
     def set_au_e_usuario(self, v: str):      self.au_e_usuario     = v
     def set_au_e_rol(self, v: str):          self.au_e_rol         = v
+    def set_au_e_perfil_alcance(self, v: str): self.au_e_perfil_alcance = v
     def set_au_e_estado(self, v: int):       self.au_e_estado      = v
 
     # ── Setters para formulario contraseña ────────────────────────────────────
@@ -6066,6 +6161,7 @@ class AdminUsuariosState(State):
         self.au_n_clave = ""
         self.au_n_clave2 = ""
         self.au_n_rol = "MEDICO_ATENCION"
+        self.au_n_perfil_alcance = "TT"
         self.au_error = ""
         self.au_dlg_nuevo = True
 
@@ -6100,6 +6196,8 @@ class AdminUsuariosState(State):
                     usuario=self.au_n_usuario.strip(),
                     clave_plain=self.au_n_clave,
                     rol=self.au_n_rol,
+                    alcance_lectura=self.au_n_perfil_alcance[0],
+                    alcance_escritura=self.au_n_perfil_alcance[1],
                 )
                 self.au_lista = listar_usuarios(s)
         except Exception as e:
@@ -6126,6 +6224,10 @@ class AdminUsuariosState(State):
         self.au_e_usuario     = u["usuario"]
         self.au_e_rol         = u["rol"]
         self.au_e_estado      = u["estado"]
+        permisos_u              = u.get("permisos") or ""
+        lectura_u   = "P" if len(permisos_u) > 1 and permisos_u[1] == "P" else "T"
+        escritura_u = "P" if len(permisos_u) > 2 and permisos_u[2] == "P" else "T"
+        self.au_e_perfil_alcance = lectura_u + escritura_u
         self.au_error         = ""
         self.au_dlg_editar    = True
 
@@ -6155,6 +6257,8 @@ class AdminUsuariosState(State):
                     usuario=self.au_e_usuario.strip(),
                     rol=self.au_e_rol,
                     estado=self.au_e_estado,
+                    alcance_lectura=self.au_e_perfil_alcance[0],
+                    alcance_escritura=self.au_e_perfil_alcance[1],
                 )
                 self.au_lista = listar_usuarios(s)
         except Exception as e:
@@ -6171,6 +6275,9 @@ class AdminUsuariosState(State):
         if not u:
             return
         nuevo_estado = 0 if u["estado"] == 1 else 1
+        permisos_u = u.get("permisos") or ""
+        lectura_u   = "P" if len(permisos_u) > 1 and permisos_u[1] == "P" else "T"
+        escritura_u = "P" if len(permisos_u) > 2 and permisos_u[2] == "P" else "T"
         try:
             with Session(engine) as s:
                 actualizar_usuario(
@@ -6184,6 +6291,8 @@ class AdminUsuariosState(State):
                     usuario=u["usuario"],
                     rol=u["rol"],
                     estado=nuevo_estado,
+                    alcance_lectura=lectura_u,
+                    alcance_escritura=escritura_u,
                 )
                 self.au_lista = listar_usuarios(s)
         except Exception as e:

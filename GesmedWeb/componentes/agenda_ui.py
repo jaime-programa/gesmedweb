@@ -479,7 +479,7 @@ def offcanvas_agenda() -> rx.Component:
                 rx.spacer(),
                 # Botón cerrar
                 rx.button(
-                    rx.icon("x", size=18),
+                    rx.icon("x", size=20),
                     on_click=AgendaState.ag_cerrar,
                     variant="ghost", color_scheme="gray",
                     size="2", type="button", cursor="pointer",

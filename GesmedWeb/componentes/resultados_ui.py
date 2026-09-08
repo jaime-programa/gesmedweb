@@ -597,6 +597,7 @@ def _panel_controles() -> rx.Component:
             rx.icon("flask-conical", size=13), "Laboratorio",
             on_click=LaboratorioState.lab_abrir(ResultadosState.ri_id_imagen_activa),
             variant="soft", type="button", size="1", width="100%",
+            disabled=State.resultados_deshabilitado_por_ajeno,
         ),
         rx.separator(width="100%"),
         # ── Cabecera lista marcas ─────────────────────────────────────────────
@@ -781,7 +782,7 @@ def upload_resultados_titulo() -> rx.Component:
                 ),
                 variant="soft", color_scheme="blue",
                 type="button", size="1",
-                disabled=ResultadosState.ri_subiendo,
+                disabled=ResultadosState.ri_subiendo | State.resultados_deshabilitado_por_ajeno,
                 gap="1",
             ),
             id="up_resultados",
@@ -790,7 +791,7 @@ def upload_resultados_titulo() -> rx.Component:
             on_drop=ResultadosState.ri_procesar_upload(
                 rx.upload_files(upload_id="up_resultados")
             ),
-            disabled=ResultadosState.ri_subiendo,
+            disabled=ResultadosState.ri_subiendo | State.resultados_deshabilitado_por_ajeno,
             border="none",
             outline="none",
             display="inline-flex",

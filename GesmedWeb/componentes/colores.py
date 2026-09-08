@@ -50,3 +50,16 @@ PRESCRIPCION_ENCABEZADO="#9FBFA9DF"
 
 # ── Navbar de atención ────────────────────────────────────────────────────────
 BORDE_BOTONES_NAVBAR = "#0BC5FE"   # borde de botones SOAP / Prescripción / Exámenes
+
+# ── Paciente ajeno (sin atención propia del médico logueado) ────────────────
+# Se usan para distinguir visualmente, en los perfiles que ven pacientes de
+# otros médicos (permisos[1] == "T"), cuáles son "propios" vs "ajenos".
+PACIENTE_AJENO_LISTA_COLOR    = "#3FA9C9"  # celeste (no tan claro): fuente en la tabla de lista_pacientes
+PACIENTE_AJENO_ATENCION_COLOR = "#9CA3AF"  # tono tenue: nombre del paciente en el navbar de atención
+
+# ── Paciente "disponible" (sin atenciones de NINGÚN médico todavía) ─────────
+# Un paciente recién creado no tiene atenciones, así que no tiene médico
+# "dueño" hasta que alguien registre la primera — mientras tanto cualquier
+# médico debe poder verlo/atenderlo aunque su perfil sea "solo propios".
+PACIENTE_DISPONIBLE_LISTA_COLOR    = "#E67E22"  # naranja: fuente en la tabla de lista_pacientes
+PACIENTE_DISPONIBLE_ATENCION_COLOR = "#E67E22"  # naranja: nombre del paciente en el navbar de atención

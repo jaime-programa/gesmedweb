@@ -7,7 +7,9 @@ from .colores import (
     TABLE_HEADER_BG_BLUE,TABLE_HEADER_BG_GREEN,TABLE_HEADER_BG_PETROLEO, TABLE_HEADER_COLOR, TABLE_BORDER,
     COLOR_RESALTA_TEXTO,
     ZEBRA_OBSCURO, ZEBRA_CLARO,BOTON_IMPRIMIR,
-    SOAP_FIELD_BORDER,SOAP_FONDO,PRESCRIPCION_FONDO,PEDIDO_FONDO,RESULTADO_FONDO
+    SOAP_FIELD_BORDER,SOAP_FONDO,PRESCRIPCION_FONDO,PEDIDO_FONDO,RESULTADO_FONDO,
+    PACIENTE_AJENO_LISTA_COLOR,
+    PACIENTE_DISPONIBLE_LISTA_COLOR,
 )
 
 
@@ -52,13 +54,18 @@ def tabla_pacientes_interactiva():
     return tabla_pacientes_con_encabezado()
 
 def _fila_paciente(p: dict) -> rx.Component:
+    _color = rx.cond(
+        p['estado_propiedad'] == "disponible",
+        PACIENTE_DISPONIBLE_LISTA_COLOR,
+        rx.cond(p['estado_propiedad'] == "ajeno", PACIENTE_AJENO_LISTA_COLOR, "inherit"),
+    )
     return rx.table.row(
-        rx.table.cell(p['nro_hclinica']),
-        rx.table.cell(p['nombre_completo']),
-        rx.table.cell(p['edad']),
-        rx.table.cell(p['grupo_sanguineo']),
-        rx.table.cell(p['seguro']),
-        rx.table.cell(p['cuantas_atenciones']),
+        rx.table.cell(p['nro_hclinica'], color=_color),
+        rx.table.cell(p['nombre_completo'], color=_color),
+        rx.table.cell(p['edad'], color=_color),
+        rx.table.cell(p['grupo_sanguineo'], color=_color),
+        rx.table.cell(p['seguro'], color=_color),
+        rx.table.cell(p['cuantas_atenciones'], color=_color),
         on_click=State.selecciona_paciente(p['nro_hclinica']),
         cursor="pointer",
         background=rx.cond(
@@ -69,21 +76,47 @@ def _fila_paciente(p: dict) -> rx.Component:
         _hover={"background": ROW_HOVER_BG},
     )
 
+def _icono_orden_pac(col: str) -> rx.Component:
+    return rx.cond(
+        State.pac_orden_col == col,
+        rx.cond(
+            State.pac_orden_asc,
+            rx.icon("chevron_up", size=12),
+            rx.icon("chevron_down", size=12),
+        ),
+        rx.icon("chevrons_up_down", size=12, color="var(--gray-7)"),
+    )
+
+def _th_paciente(texto: str, col: str) -> rx.Component:
+    return rx.table.column_header_cell(
+        rx.hstack(
+            rx.text(texto),
+            _icono_orden_pac(col),
+            align="center",
+            spacing="1",
+        ),
+        on_click=State.pac_toggle_orden(col),
+        cursor="pointer",
+        user_select="none",
+    )
+
 def tabla_pacientes_con_encabezado():
     return rx.scroll_area(
         rx.table.root(
             rx.table.header(
                 rx.table.row(
-                    rx.table.column_header_cell("# HClínica"),
-                    rx.table.column_header_cell("Nombre"),
-                    rx.table.column_header_cell("Edad"),
-                    rx.table.column_header_cell("Gr. Sanguíneo"),
-                    rx.table.column_header_cell("Seguro"),
-                    rx.table.column_header_cell("Atenciones"),
-                )
+                    _th_paciente("# HClínica", "nro_hclinica"),
+                    _th_paciente("Nombre", "nombre_completo"),
+                    _th_paciente("Edad", "edad"),
+                    _th_paciente("Gr. Sanguíneo", "grupo_sanguineo"),
+                    _th_paciente("Seguro", "seguro"),
+                    _th_paciente("Atenciones", "cuantas_atenciones"),
+                ),
+                style={"position": "sticky", "top": "0", "z_index": "1"},
             ),
-            rx.table.body(rx.foreach(State.lista_pacientes, _fila_paciente)),
+            rx.table.body(rx.foreach(State.lista_pacientes_ordenada, _fila_paciente)),
             width="100%",
+            style={"border_collapse": "collapse"},
         ),
         height="75vh",
     )

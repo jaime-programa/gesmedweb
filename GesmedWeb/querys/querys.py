@@ -39,7 +39,7 @@ def carga_seguros() -> list[str]:
         statement = select(SeguroMedico.nombre_seguro).where(SeguroMedico.esta_activo == 1).order_by(SeguroMedico.nombre_seguro)
         return session.exec(statement).all()
 
-def consultar_pacientes_por_nombre(session, filtro: str, medico_id: int = 1):
+def consultar_pacientes_por_nombre(session, filtro: str, medico_id: int = 1, solo_propios: bool = False):
     crypto = GesmedCrypto.para_medico(medico_id)
     statement = (
         select(
@@ -54,7 +54,36 @@ def consultar_pacientes_por_nombre(session, filtro: str, medico_id: int = 1):
         .join(Atencion, Atencion.lk_paciente == Paciente.nro_hclinica, isouter=True)
         .group_by(Paciente.nro_hclinica)
     )
+    if solo_propios:
+        # "Solo mis pacientes" (permisos[1] == "P"): limita a pacientes con
+        # al menos una atención propia, MÁS los que no tienen ninguna atención
+        # todavía (recién creados, sin médico "dueño" — cualquiera debe poder
+        # verlos para poder registrarles su primera atención). No restringe
+        # el conteo de arriba (que sigue mostrando el total de cualquier médico).
+        statement = statement.where(
+            or_(
+                Paciente.nro_hclinica.in_(
+                    select(Atencion.lk_paciente).where(Atencion.lk_medico == medico_id)
+                ),
+                Paciente.nro_hclinica.not_in(select(Atencion.lk_paciente)),
+            )
+        )
     pacientes = session.exec(statement).all()
+
+    # Pacientes "propios" del médico logueado (con al menos una atención suya),
+    # para poder distinguirlos visualmente de los "ajenos" en la lista — se
+    # calcula siempre, independiente de "solo_propios", porque un perfil con
+    # lectura "T" también quiere ver esta distinción aunque no filtre nada.
+    propios_ids = set(
+        session.exec(
+            select(Atencion.lk_paciente).where(Atencion.lk_medico == medico_id).distinct()
+        ).all()
+    )
+
+    def _estado_propiedad(p) -> str:
+        if p.numero_atenciones == 0:
+            return "disponible"  # sin atenciones de nadie: cualquiera puede reclamarlo
+        return "propio" if p.nro_hclinica in propios_ids else "ajeno"
 
     registros = [
         {
@@ -66,6 +95,7 @@ def consultar_pacientes_por_nombre(session, filtro: str, medico_id: int = 1):
             "seguro": p.seguro,
             "grupo_sanguineo": p.grupo_sanguineo,
             "cuantas_atenciones": p.numero_atenciones,
+            "estado_propiedad": _estado_propiedad(p),
         }
         for p in pacientes
     ]
@@ -736,6 +766,49 @@ def guardar_pedido_examenes(
 
 # ── Gestión de usuarios ───────────────────────────────────────────────────────
 
+def _permisos_con_alcance(permisos_actual: str, alcance_lectura: str, alcance_escritura: str) -> str:
+    """
+    Fija las posiciones 1 y 2 del string "permisos":
+      posición 1 = alcance de LECTURA  (T=ve todos los pacientes, P=solo los propios)
+      posición 2 = alcance de ESCRITURA (T=modifica todos, P=solo los propios)
+    Conserva el resto de posiciones tal cual (p.ej. posición 0 = 'R'/'X' de
+    acceso a configuración de reportes).
+    """
+    letras = list((permisos_actual or "").ljust(4, "X"))
+    letras[1] = "P" if alcance_lectura == "P" else "T"
+    letras[2] = "P" if alcance_escritura == "P" else "T"
+    return "".join(letras)
+
+
+def estado_propiedad_paciente(session, nro_hclinica: int, medico_id: int) -> tuple[bool, bool]:
+    """
+    Retorna (es_accesible, es_disponible) para un paciente puntual:
+
+    - es_disponible: True si el paciente no tiene NINGUNA atención registrada
+      (de ningún médico) — es un paciente recién creado, sin atenciones
+      todavía, así que ningún médico es "dueño" y cualquiera puede reclamarlo
+      con su primera atención.
+    - es_accesible: True si es_disponible, o si el médico dado tiene al menos
+      una atención propia con ese paciente. Es el flag que deben usar los
+      guards de lectura/escritura por alcance de pacientes (permisos[1]/[2]).
+
+    En cuanto un médico registra la primera atención, el paciente deja de
+    estar "disponible" y pasa a ser exclusivamente suyo (esta misma consulta,
+    ejecutada de nuevo, ya lo refleja sin ningún paso adicional).
+    """
+    tiene_alguna = session.exec(
+        select(Atencion.id_atencion).where(Atencion.lk_paciente == nro_hclinica).limit(1)
+    ).first()
+    if tiene_alguna is None:
+        return True, True
+    tiene_propia = session.exec(
+        select(Atencion.id_atencion)
+        .where(Atencion.lk_paciente == nro_hclinica, Atencion.lk_medico == medico_id)
+        .limit(1)
+    ).first()
+    return (tiene_propia is not None), False
+
+
 def listar_usuarios(session) -> list[dict]:
     rows = session.exec(select(Points).order_by(asc(Points.nombre_medico))).all()
     return [
@@ -749,6 +822,7 @@ def listar_usuarios(session) -> list[dict]:
             "usuario":        r.usuario,
             "rol":            r.rol,
             "estado":         r.estado,
+            "permisos":       r.permisos,
         }
         for r in rows
     ]
@@ -756,7 +830,8 @@ def listar_usuarios(session) -> list[dict]:
 
 def crear_usuario(session, nombre: str, especialidad: str, cod_esp: str,
                   celular: str, email: str, usuario: str,
-                  clave_plain: str, rol: str) -> Points:
+                  clave_plain: str, rol: str,
+                  alcance_lectura: str = "T", alcance_escritura: str = "T") -> Points:
     clave_hash = _bcrypt.hashpw(clave_plain.encode("utf-8"), _bcrypt.gensalt()).decode("utf-8")
     nuevo = Points(
         nombre_medico=nombre,
@@ -766,7 +841,7 @@ def crear_usuario(session, nombre: str, especialidad: str, cod_esp: str,
         email=email,
         usuario=usuario,
         clave=clave_hash,
-        permisos="",
+        permisos=_permisos_con_alcance("", alcance_lectura, alcance_escritura),
         estado=1,
         rol=rol,
     )
@@ -778,7 +853,8 @@ def crear_usuario(session, nombre: str, especialidad: str, cod_esp: str,
 
 def actualizar_usuario(session, id_medico: int, nombre: str, especialidad: str,
                        cod_esp: str, celular: str, email: str,
-                       usuario: str, rol: str, estado: int) -> None:
+                       usuario: str, rol: str, estado: int,
+                       alcance_lectura: str = "T", alcance_escritura: str = "T") -> None:
     u = session.get(Points, id_medico)
     if not u:
         return
@@ -790,6 +866,7 @@ def actualizar_usuario(session, id_medico: int, nombre: str, especialidad: str,
     u.usuario         = usuario
     u.rol             = rol
     u.estado          = estado
+    u.permisos        = _permisos_con_alcance(u.permisos, alcance_lectura, alcance_escritura)
     session.add(u)
     session.commit()
 
