@@ -181,12 +181,15 @@ def paso_crear_base_y_usuario(admin: dict, db_name: str, app_user: str, app_pass
     return True
 
 
-def paso_aplicar_schema(app: dict, host: str, port: str, db_name: str) -> bool:
+def paso_aplicar_schema(admin: dict, db_name: str) -> bool:
+    """Aplica el esquema con las credenciales de administrador (no las de la app):
+    gesmed_estructura.sql define vistas con cláusula DEFINER explícita, y crear/
+    recrear ese tipo de objeto requiere el privilegio SUPER/SET USER — algo que la
+    cuenta de aplicación no debe tener, pero el admin de MariaDB sí."""
     if not ESQUEMA_SQL.exists():
         print(f"  ✗ No existe {ESQUEMA_SQL.relative_to(_ROOT)}.")
         return False
-    params = {"host": host, "port": port, "user": app["user"], "password": app["password"]}
-    if not _mysql_importar_archivo(params, db_name, ESQUEMA_SQL):
+    if not _mysql_importar_archivo(admin, db_name, ESQUEMA_SQL):
         return False
     print(f"  ✓ Esquema aplicado en `{db_name}`.")
     return True
@@ -206,7 +209,7 @@ def paso_instalar_base_logica(nombre_logico: str, admin: dict, app: dict) -> str
     print(f"\n── Instalando base {nombre_logico} (`{db_name}`) ──")
     if not paso_crear_base_y_usuario(admin, db_name, app["user"], app["password"]):
         return None
-    if not paso_aplicar_schema(app, host, port, db_name):
+    if not paso_aplicar_schema(admin, db_name):
         return None
 
     url = _construir_url(app["user"], app["password"], host, port, db_name)
