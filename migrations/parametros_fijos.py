@@ -20,7 +20,7 @@ Modo de trabajo (igual patrón que orquestador.py: subprocess a mysqldump/mysql)
                   --add-drop-table para que sea idempotente).
     instalar()  → aplica ese archivo contra la base de datos destino
                   (por defecto gesmed local; en un servidor nuevo, apunta
-                  las variables de entorno GESMED_DB_* a esa base).
+                  la variable de entorno GESMED_DB_URL a esa base).
 
 Uso:
     # Regenerar el snapshot a partir del gesmed local actual (cuando cambian catálogos)
@@ -29,13 +29,12 @@ Uso:
     # Instalar/reinstalar las tablas de parámetros en la base destino
     .virtual/bin/python -m migrations.parametros_fijos --instalar
 
-Variables de entorno (mismas que orquestador.py, para mysqldump/mysql):
-    GESMED_DB_HOST, GESMED_DB_PORT, GESMED_DB_USER, GESMED_DB_PASSWORD, GESMED_DB_NAME
+Variables de entorno:
+    GESMED_DB_URL — misma convención que usa la app (ver GesmedWeb/querys/querys.py)
 """
 
 from __future__ import annotations
 
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -46,6 +45,8 @@ if str(_ROOT) not in sys.path:
 
 from dotenv import load_dotenv
 load_dotenv(_ROOT / ".env")
+
+from migrations.migrador_base import db_params as _db_params
 
 TABLAS = [
     "cie10",
@@ -67,20 +68,12 @@ TABLAS = [
 
 ARCHIVO_SNAPSHOT = _ROOT / "sql" / "parametros_fijos.sql"
 
-
-def _db_params() -> dict:
-    return {
-        "host":     os.environ.get("GESMED_DB_HOST",     "localhost"),
-        "port":     os.environ.get("GESMED_DB_PORT",     "3306"),
-        "user":     os.environ.get("GESMED_DB_USER",     "med_admin"),
-        "password": os.environ.get("GESMED_DB_PASSWORD", "gesmed01"),
-        "name":     os.environ.get("GESMED_DB_NAME",     "gesmed"),
-    }
+_DB_DEFAULT_URL = "mysql+pymysql://med_admin:gesmed01@localhost:3306/gesmed"
 
 
 def congelar() -> bool:
     """Vuelca estructura + datos actuales de TABLAS a un único archivo .sql."""
-    p = _db_params()
+    p = _db_params("GESMED_DB_URL", _DB_DEFAULT_URL)
     ARCHIVO_SNAPSHOT.parent.mkdir(exist_ok=True)
 
     cmd = [
@@ -129,7 +122,7 @@ def instalar() -> bool:
         print(f"  ✗ No existe {ARCHIVO_SNAPSHOT.relative_to(_ROOT)}. Ejecute primero --congelar.")
         return False
 
-    p = _db_params()
+    p = _db_params("GESMED_DB_URL", _DB_DEFAULT_URL)
     cmd = [
         "mysql",
         f"--host={p['host']}",

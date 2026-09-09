@@ -26,6 +26,7 @@ if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
 from GesmedWeb.crypto import GesmedCrypto
@@ -34,6 +35,21 @@ from GesmedWeb.crypto import GesmedCrypto
 def _engine(env_var: str, default_url: str):
     url = os.environ.get(env_var, default_url)
     return create_engine(url, echo=False, pool_pre_ping=True)
+
+
+def db_params(env_var: str, default_url: str) -> dict:
+    """Descompone la URL de SQLAlchemy de env_var (GESMED_DB_URL/AMAYMED_DB_URL)
+    en host/port/user/password/name — lo que necesitan los subprocess a
+    mysqldump/mysql. Única fuente de verdad para la conexión: no hay
+    variables *_DB_HOST/PORT/USER/PASSWORD/NAME independientes."""
+    url = make_url(os.environ.get(env_var, default_url))
+    return {
+        "host": url.host or "localhost",
+        "port": str(url.port or 3306),
+        "user": url.username or "",
+        "password": url.password or "",
+        "name": url.database or "",
+    }
 
 
 class MigradorTabla(ABC):

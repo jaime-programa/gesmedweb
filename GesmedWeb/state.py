@@ -46,8 +46,8 @@ from .utils.imagen_utils import (
     leer_imagen          as img_leer,
 )
 from .querys.querys import (
-    connect, consultar_pacientes_por_nombre, estado_propiedad_paciente, historial_atenciones_con_cie10,
-    c1, historial_diagnosticos, atenciones_vinculadas_a_diagnostico,
+    engine, consultar_pacientes_por_nombre, estado_propiedad_paciente, historial_atenciones_con_cie10,
+    historial_diagnosticos, atenciones_vinculadas_a_diagnostico,
     diagnosticos_vinculados_a_atencion, carga_medicos, carga_seguros,
     buscar_medicamentos, listar_presentaciones, listar_alergias_paciente,
     listar_prescripcion_atencion, obtener_prescripcion_cuidados,
@@ -64,8 +64,6 @@ from .querys.querys import (
     listar_usuarios, crear_usuario, actualizar_usuario, resetear_clave,
 )
 from .crypto import GesmedCrypto
-
-engine=connect()
 
 class State(rx.State):
     is_authenticated: bool = False  #Controla si el usuario se ha autenticado
@@ -223,7 +221,6 @@ class State(rx.State):
         self.login_cargando = True
         self.error_message = ""
         yield
-        engine=c1()
         with Session(engine) as sesion:
             query = select(Points).where(Points.usuario == self.px1)
             resultado = sesion.exec(query)

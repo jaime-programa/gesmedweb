@@ -18,14 +18,9 @@ import os
 
 _URL_GESMED  = os.environ.get("GESMED_DB_URL",  "mysql+pymysql://med_admin:gesmed01@localhost:3306/gesmed")
 
-def connect():
-    return create_engine(_URL_GESMED, echo=False, pool_pre_ping=True)
+engine = create_engine(_URL_GESMED, echo=False, pool_pre_ping=True)
 
-def c1():
-    return create_engine(_URL_GESMED, echo=False, pool_pre_ping=True)
-    
 def carga_medicos():
-    engine=c1()
     with Session(engine) as session:
         statement=select(Points.id_medico,Points.nombre_medico,Points.especialidad,Points.cod_especialidad,Points.celular,Points.email,Points.permisos).where(Points.estado==1)
         resultados=session.exec(statement).all()
@@ -34,7 +29,6 @@ def carga_medicos():
     return medicos
 
 def carga_seguros() -> list[str]:
-    engine = connect()
     with Session(engine) as session:
         statement = select(SeguroMedico.nombre_seguro).where(SeguroMedico.esta_activo == 1).order_by(SeguroMedico.nombre_seguro)
         return session.exec(statement).all()
@@ -208,7 +202,6 @@ def diagnosticos_vinculados_a_atencion(session, id_atencion: int) -> list:
 
 
 def actualiza_vistas():
-    engine=connect()
     with Session(engine) as session:
         session.exec(
             """

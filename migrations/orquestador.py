@@ -8,8 +8,7 @@ Uso:
 Variables de entorno opcionales (tienen defaults):
     GESMED_DB_URL   mysql+pymysql://med_admin:gesmed01@localhost:3306/gesmed
     AMAYMED_DB_URL  mysql+pymysql://med_admin:gesmed01@localhost:3306/amaymed
-    GESMED_DB_HOST, GESMED_DB_PORT, GESMED_DB_USER, GESMED_DB_PASSWORD, GESMED_DB_NAME
-    (usadas solo para mysqldump, independientes de la URL de SQLAlchemy)
+    (los parámetros para mysqldump se derivan de estas mismas URLs)
 """
 
 from __future__ import annotations
@@ -39,26 +38,19 @@ from migrations.migrador_certificado               import MigradorCertificado
 from migrations.migrador_examenes                  import MigradorExamenesGrupo, MigradorExamenesCatalogo
 from migrations.migrador_examenes_pedido           import MigradorExamenesPedido
 from migrations.migrador_pedido_imagen             import MigradorPedidoImagen
+from migrations.migrador_base                      import db_params as _url_db_params
 
 
-# ── Parámetros de conexión para mysqldump ─────────────────────────────────────
+# ── Parámetros de conexión para mysqldump (derivados de las URLs de SQLAlchemy) ──
 def _db_params() -> dict:
-    return {
-        "host":     os.environ.get("GESMED_DB_HOST",     "localhost"),
-        "port":     os.environ.get("GESMED_DB_PORT",     "3306"),
-        "user":     os.environ.get("GESMED_DB_USER",     "med_admin"),
-        "password": os.environ.get("GESMED_DB_PASSWORD", "gesmed01"),
-        "name":     os.environ.get("GESMED_DB_NAME",     "gesmed"),
-    }
+    return _url_db_params(
+        "GESMED_DB_URL", "mysql+pymysql://med_admin:gesmed01@localhost:3306/gesmed"
+    )
 
 def _amaymed_params() -> dict:
-    return {
-        "host":     os.environ.get("AMAYMED_DB_HOST",     "localhost"),
-        "port":     os.environ.get("AMAYMED_DB_PORT",     "3306"),
-        "user":     os.environ.get("AMAYMED_DB_USER",     "med_admin"),
-        "password": os.environ.get("AMAYMED_DB_PASSWORD", "gesmed01"),
-        "name":     os.environ.get("AMAYMED_DB_NAME",     "amaymed"),
-    }
+    return _url_db_params(
+        "AMAYMED_DB_URL", "mysql+pymysql://med_admin:gesmed01@localhost:3306/amaymed"
+    )
 
 
 class OrquestadorMigracion:
