@@ -46,7 +46,7 @@ from .utils.imagen_utils import (
     leer_imagen          as img_leer,
 )
 from .querys.querys import (
-    engine, consultar_pacientes_por_nombre, estado_propiedad_paciente, historial_atenciones_con_cie10,
+    get_engine, base_actual, cambiar_base, base_migrada_disponible, consultar_pacientes_por_nombre, estado_propiedad_paciente, historial_atenciones_con_cie10,
     historial_diagnosticos, atenciones_vinculadas_a_diagnostico,
     diagnosticos_vinculados_a_atencion, carga_medicos, carga_seguros,
     buscar_medicamentos, listar_presentaciones, listar_alergias_paciente,
@@ -221,7 +221,7 @@ class State(rx.State):
         self.login_cargando = True
         self.error_message = ""
         yield
-        with Session(engine) as sesion:
+        with Session(get_engine()) as sesion:
             query = select(Points).where(Points.usuario == self.px1)
             resultado = sesion.exec(query)
             user = resultado.first()
@@ -484,7 +484,7 @@ class State(rx.State):
         print(self.lista_medicos)
 
     def carga_pacientes_filtrados(self):
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             self.lista_pacientes=consultar_pacientes_por_nombre(session,self.que_paciente_busco,self.id_medico,self.ve_solo_propios_pacientes)
 
     def _autoriza_y_selecciona_paciente(self, datos: list) -> bool:
@@ -501,7 +501,7 @@ class State(rx.State):
         para cualquier médico (puede verlo y registrarle su primera
         atención), sin importar su alcance de lectura/escritura."""
         nro_hclinica = datos[0]
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             accesible, disponible = estado_propiedad_paciente(session, nro_hclinica, self.id_medico)
         if self.ve_solo_propios_pacientes and not accesible:
             return False
@@ -536,7 +536,7 @@ class State(rx.State):
             self.actualiza_atenciones_filtradas
 
     def carga_atenciones(self):
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             self.lista_atenciones=historial_atenciones_con_cie10(session,self.paciente_seleccionado[0],'')
             self.lista_diagnosticos=historial_diagnosticos(session,self.paciente_seleccionado[0],self.id_medico)
             self.lista_ant_familiares=listar_ant_familiares(session,self.paciente_seleccionado[0],self.id_medico)
@@ -574,7 +574,7 @@ class State(rx.State):
         self.que_historial_busco
 
     def actualiza_atenciones_filtradas(self):
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             self.lista_atenciones=historial_atenciones_con_cie10(session,self.paciente_seleccionado[0],self.que_historial_busco)
         #self.lista_atenciones=historial_atenciones(self.paciente_seleccionado[0],self.que_historial_busco)
         
@@ -598,7 +598,7 @@ class State(rx.State):
             print(f"🟦 Añadir nuevo diagnostico")
         else:
             #PONER ATENCIÓN AQUÍ  TESLA
-            with Session(engine) as session:
+            with Session(get_engine()) as session:
                 self.lista_atenciones_vinculadas_a_diagnostico=atenciones_vinculadas_a_diagnostico(session,self.diagnostico_seleccionado[0])
             print(self.lista_atenciones_vinculadas_a_diagnostico)
         self.atenciones_con_estilo()
@@ -888,7 +888,7 @@ class State(rx.State):
                 self.id_atencion_seleccionada = 0
                 self.lista_diagnosticos_vinculados = []
                 if id_diagnostico != 0:
-                    with Session(engine) as session:
+                    with Session(get_engine()) as session:
                         self.lista_atenciones_vinculadas_a_diagnostico = atenciones_vinculadas_a_diagnostico(session, id_diagnostico)
                     self.filtro_diagnostico_activo = True
                 else:
@@ -921,7 +921,7 @@ class State(rx.State):
         self.id_atencion_seleccionada = id_atencion
         self.ha_tab_historia = "soap"
         self.ha_panel_expandido = False
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             self.lista_diagnosticos_vinculados = diagnosticos_vinculados_a_atencion(session, id_atencion)
             self.ha_sv_lista    = signos_vitales_atencion(session, id_atencion)
             self.ha_diagnosticos = diagnosticos_atencion_detalle(session, id_atencion)
@@ -995,7 +995,7 @@ class AtencionState(State):
         self.soap_grabado      = True
         self.vd_vinculado      = True
         self.soap_modo_edicion = False
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             catalogo = cargar_catalogo_sv(session)
             sv_vals  = cargar_sv_atencion(session, self.soap_id_atencion)
         self.sv_catalogo = [
@@ -1208,7 +1208,7 @@ class AtencionState(State):
         if not self.paciente_seleccionado:
             return
         nro = self.paciente_seleccionado[0]
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             rows = historial_diagnosticos(session, nro, self.id_medico)
         self.lista_diagnosticos = rows
         self.vd_lista_diagnosticos = [
@@ -1221,7 +1221,7 @@ class AtencionState(State):
             self.vd_dialog_open = True
             return
         nro = self.paciente_seleccionado[0]
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             rows = historial_diagnosticos(session, nro, self.id_medico)
             # Pre-marca los vínculos existentes cuando el SOAP ya está grabado
             if self.soap_grabado and self.soap_id_atencion:
@@ -1268,7 +1268,7 @@ class AtencionState(State):
                 self.vd_error = "No hay paciente seleccionado."
                 return
             nro = self.paciente_seleccionado[0]
-            with Session(engine) as session:
+            with Session(get_engine()) as session:
                 nueva_atencion = Atencion(
                     lk_paciente=nro,
                     lk_medico=self.id_medico,
@@ -1305,7 +1305,7 @@ class AtencionState(State):
             self.vd_modo_nuevo_soap = False
             self.soap_vincular_msg  = False
             self.lista_diagnosticos_vinculados = list(self.vd_seleccionados)
-            with Session(engine) as session:
+            with Session(get_engine()) as session:
                 self.lista_atenciones = historial_atenciones_con_cie10(session, nro, "")
             self.que_historial_busco = ""
         else:
@@ -1313,7 +1313,7 @@ class AtencionState(State):
             if not self.soap_id_atencion:
                 self.vd_error = "Primero grabe el SOAP."
                 return
-            with Session(engine) as session:
+            with Session(get_engine()) as session:
                 existentes = session.exec(
                     select(Rel_atencion_diagnostico).where(
                         Rel_atencion_diagnostico.lk_atencion == self.soap_id_atencion
@@ -1338,7 +1338,7 @@ class AtencionState(State):
     def cerrar_vinculos_ok(self):
         self.vd_vinculos_ok = False
         if self.paciente_seleccionado:
-            with Session(engine) as session:
+            with Session(get_engine()) as session:
                 self.lista_atenciones = historial_atenciones_con_cie10(
                     session, self.paciente_seleccionado[0], ""
                 )
@@ -1370,7 +1370,7 @@ class AtencionState(State):
         self.offcanvas_pedido_examenes = False
         self.offcanvas_resultados_examenes = False
         if not self.sv_catalogo:
-            with Session(engine) as session:
+            with Session(get_engine()) as session:
                 self.sv_catalogo = cargar_catalogo_sv(session)
 
     def cierra_offcanvas_actual(self):
@@ -1478,7 +1478,7 @@ class AtencionState(State):
             return
         if not self.soap_id_atencion:
             return
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             actualizar_atencion(
                 session,
                 self.soap_id_atencion,
@@ -1500,7 +1500,7 @@ class AtencionState(State):
         self.soap_snap_plan      = self.soap_plan
         if self.paciente_seleccionado:
             nro = self.paciente_seleccionado[0]
-            with Session(engine) as session:
+            with Session(get_engine()) as session:
                 self.lista_atenciones = historial_atenciones_con_cie10(session, nro, "")
             self.que_historial_busco = ""
 
@@ -1636,7 +1636,7 @@ class PacienteState(State):
         try:
             # ✅ Usa el mismo engine que el resto de tu app
             _crypto = GesmedCrypto.para_medico(self.id_medico)
-            with Session(engine) as session:
+            with Session(get_engine()) as session:
                 nuevo = Paciente(
                     nombre_completo=_crypto.encriptar(self.nombre_completo.strip()),
                     sexo=self.sexo,
@@ -1695,7 +1695,7 @@ class EditPacienteState(State):
             return
         nro = self.paciente_seleccionado[0]
         _crypto = GesmedCrypto.para_medico(self.id_medico)
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             paciente = session.get(Paciente, nro)
             print(f"🟦 paciente: {paciente}")
             if paciente:
@@ -1774,7 +1774,7 @@ class EditPacienteState(State):
         nro = self.paciente_seleccionado[0]
         _crypto = GesmedCrypto.para_medico(self.id_medico)
         try:
-            with Session(engine) as session:
+            with Session(get_engine()) as session:
                 paciente = session.get(Paciente, nro)
                 if paciente:
                     paciente.nombre_completo = _crypto.encriptar(self.ep_nombre_completo.strip())
@@ -1817,7 +1817,7 @@ class NuevoDiagnosticoState(State):
 
     def _nd_cargar_iniciales(self) -> list[dict]:
         """Primeros 100 registros CIE10 ordenados por código (carga inicial y tras selección)."""
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             rows = session.exec(
                 select(Cie10).order_by(Cie10.cod_cie10).limit(100)
             ).all()
@@ -1891,7 +1891,7 @@ class NuevoDiagnosticoState(State):
         self.nd_cie10 = ""
         self.nd_nombre_cie10 = ""
         if len(v.strip()) >= 3:
-            with Session(engine) as session:
+            with Session(get_engine()) as session:
                 filtro = f"%{v.strip()}%"
                 stmt = (
                     select(Cie10)
@@ -1947,7 +1947,7 @@ class NuevoDiagnosticoState(State):
         nodup = f"{nro}_{self.nd_cie10.strip()}_{self.nd_fecha_diagnostico}"
         _crypto = GesmedCrypto.para_medico(self.id_medico)
         try:
-            with Session(engine) as session:
+            with Session(get_engine()) as session:
                 nuevo = Diagnostico(
                     lk_paciente=nro,
                     lk_cie10=self.nd_cie10.strip(),
@@ -2166,7 +2166,7 @@ class PrescripcionState(State):
             self.px_editando = False
         self.px_id_atencion = id_atencion
         self._reset_form()
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             self.px_lista_items         = listar_prescripcion_atencion(session, id_atencion, self.id_medico)
             self.px_lista_presentaciones = listar_presentaciones(session)
             self.px_lista_medicamentos  = buscar_medicamentos(session)
@@ -2230,7 +2230,7 @@ class PrescripcionState(State):
         self.px_modo       = "edicion" if es_hoy else "lectura"
         self.px_id_atencion = id_atencion
         self._reset_form()
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             self.px_lista_items          = listar_prescripcion_atencion(session, id_atencion, self.id_medico)
             self.px_lista_presentaciones = listar_presentaciones(session)
             self.px_lista_medicamentos   = buscar_medicamentos(session)
@@ -2249,20 +2249,20 @@ class PrescripcionState(State):
         self.px_med_cod    = 0
         self.px_med_nombre = ""
         tipo = self.px_filtro_tipo if self.px_filtro_tipo > 0 else None
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             self.px_lista_medicamentos = buscar_medicamentos(session, v, tipo)
 
     def set_px_filtro_tipo(self, v: str):
         self.px_filtro_tipo = int(v)
         tipo = int(v) if int(v) > 0 else None
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             self.px_lista_medicamentos = buscar_medicamentos(session, self.px_filtro_med, tipo)
 
     def set_px_filtro_tipo_nombre(self, v: str):
         m = {"Todos": 0, "Catálogo Base": 1, "Añadidos en consulta": 2,"Accesorios y Equipos":3}
         self.px_filtro_tipo = m.get(v, 0)
         tipo = self.px_filtro_tipo if self.px_filtro_tipo > 0 else None
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             self.px_lista_medicamentos = buscar_medicamentos(session, self.px_filtro_med, tipo)
 
     def seleccionar_medicamento(self, cod_gen: int, nombre: str):
@@ -2309,7 +2309,7 @@ class PrescripcionState(State):
             self.px_form_error = "No hay atención activa."
             return
         try:
-            with Session(engine) as session:
+            with Session(get_engine()) as session:
                 guardar_item_prescripcion(
                     session=session,
                     lk_paciente=self.paciente_seleccionado[0],
@@ -2331,7 +2331,7 @@ class PrescripcionState(State):
     def eliminar_item(self, id_prescripcion: int):
         if not self.puede_escribir_paciente_actual:
             return
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             eliminar_item_prescripcion(session, id_prescripcion)
             self.px_lista_items = listar_prescripcion_atencion(
                 session, self.px_id_atencion, self.id_medico
@@ -2348,7 +2348,7 @@ class PrescripcionState(State):
         if not self.px_id_atencion:
             return
         try:
-            with Session(engine) as session:
+            with Session(get_engine()) as session:
                 actualizar_prescripcion_cuidados(
                     session, self.px_id_atencion, self.px_cuidados_generales
                 )
@@ -2365,7 +2365,7 @@ class PrescripcionState(State):
         if not self.paciente_seleccionado:
             return
         nro = self.paciente_seleccionado[0]
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             self.hp_lista = historial_prescripciones_paciente(session, nro, self.id_medico)
 
     def set_hp_filtro(self, v: str):
@@ -2404,7 +2404,7 @@ class PrescripcionState(State):
                 except Exception:
                     self.hp_sel_edad = ""
                 break
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             self.hp_sel_items        = listar_prescripcion_atencion(session, id_atencion, self.id_medico)
             self.hp_sel_diagnosticos = diagnosticos_atencion_detalle(session, id_atencion)
             cuidados = obtener_prescripcion_cuidados(session, id_atencion)
@@ -2418,7 +2418,7 @@ class PrescripcionState(State):
             return
         if self.px_id_atencion:
             try:
-                with Session(engine) as session:
+                with Session(get_engine()) as session:
                     actualizar_prescripcion_cuidados(
                         session, self.px_id_atencion, self.px_cuidados_generales
                     )
@@ -2442,7 +2442,7 @@ class PrescripcionState(State):
             return
         if self.px_id_atencion:
             try:
-                with Session(engine) as session:
+                with Session(get_engine()) as session:
                     actualizar_prescripcion_cuidados(
                         session, self.px_id_atencion, self.px_cuidados_generales
                     )
@@ -2501,7 +2501,7 @@ class PrescripcionState(State):
             self.px_edit_error = "La cantidad debe ser al menos 1."
             return
         try:
-            with Session(engine) as session:
+            with Session(get_engine()) as session:
                 actualizar_item_prescripcion(
                     session=session,
                     id_prescripcion=self.px_edit_id,
@@ -2543,7 +2543,7 @@ class PrescripcionState(State):
             self.px_nuevo_gen_error = "El nombre genérico es obligatorio."
             return
         try:
-            with Session(engine) as session:
+            with Session(get_engine()) as session:
                 nuevo = agregar_medicamento_nuevo(
                     session,
                     self.px_nuevo_gen_nombre,
@@ -2594,7 +2594,7 @@ class MantenimientoMedState(State):
     mm_error:        str        = ""
 
     def abrir_dlg(self):
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             self.mm_tipos = listar_tipos_medicamento(session)
         self.mm_tipo_id      = str(self.mm_tipos[0]["id_tipo"]) if self.mm_tipos else ""
         self.mm_generico     = ""
@@ -2618,7 +2618,7 @@ class MantenimientoMedState(State):
         self.mm_generico = v.upper()
         texto = self.mm_generico.strip()
         if len(texto) >= 3:
-            with Session(engine) as session:
+            with Session(get_engine()) as session:
                 self.mm_similares = buscar_similares_medicamento(session, texto)
         else:
             self.mm_similares = []
@@ -2648,7 +2648,7 @@ class MantenimientoMedState(State):
 
     def _guardar(self):
         try:
-            with Session(engine) as session:
+            with Session(get_engine()) as session:
                 guardar_medicamento_catalogo(
                     session,
                     nombre_generico=self.mm_generico.strip(),
@@ -2691,14 +2691,14 @@ class NuevoAntFamiliarState(State):
             return
         _crypto = GesmedCrypto.para_medico(self.id_medico)
         try:
-            with Session(engine) as s:
+            with Session(get_engine()) as s:
                 s.add(AntecedenteFamiliar(
                     lk_paciente    = self.paciente_seleccionado[0],
                     descripcion    = _crypto.encriptar(self.naf_descripcion.strip()),
                     fecha_registro = date.fromisoformat(self.naf_fecha_registro),
                 ))
                 s.commit()
-            with Session(engine) as s:
+            with Session(get_engine()) as s:
                 self.lista_ant_familiares = listar_ant_familiares(
                     s, self.paciente_seleccionado[0], self.id_medico
                 )
@@ -2787,7 +2787,7 @@ class PedidoExamenesState(AtencionState):
     # ── Apertura ──────────────────────────────────────────────────────────────
 
     def pe_abrir(self, id_atencion: int):
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             self.pe_catalogo = cargar_catalogo_examenes(session)
             self.pe_grupos   = cargar_grupos_examenes(session)
             pedido           = cargar_pedido_atencion(session, id_atencion)
@@ -2862,7 +2862,7 @@ class PedidoExamenesState(AtencionState):
             self.pe_error = "Agregue al menos un examen al pedido."
             return
         try:
-            with Session(engine) as session:
+            with Session(get_engine()) as session:
                 guardar_pedido_examenes(
                     session,
                     lk_paciente=self.paciente_seleccionado[0],
@@ -2887,7 +2887,7 @@ class PedidoExamenesState(AtencionState):
             self.pe_error = "No hay atención activa."
             return
         try:
-            with Session(engine) as session:
+            with Session(get_engine()) as session:
                 guardar_pedido_examenes(
                     session,
                     lk_paciente=self.paciente_seleccionado[0],
@@ -3051,7 +3051,7 @@ class OtrosPedidoState(AtencionState):
         if not self.oe_sel_tipo:
             self.oe_catalogo = []
             return
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             rows = session.exec(
                 select(OtrosExamenesCatalogo)
                 .where(OtrosExamenesCatalogo.lk_examen_tipo == self.oe_sel_tipo)
@@ -3065,7 +3065,7 @@ class OtrosPedidoState(AtencionState):
         if not self.oe_edit_sel_tipo:
             self.oe_edit_catalogo = []
             return
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             rows = session.exec(
                 select(OtrosExamenesCatalogo)
                 .where(OtrosExamenesCatalogo.lk_examen_tipo == self.oe_edit_sel_tipo)
@@ -3079,7 +3079,7 @@ class OtrosPedidoState(AtencionState):
         if not self.soap_id_atencion:
             self.oe_lista = []
             return
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             rows = session.execute(text("""
                 SELECT p.id_examen_pedido, t.examen_tipo, c.examen_alias, c.examen_nombre,
                        p.detalle_pedido, p.lk_catalogo, p.lk_diagnostico, t.id_examen_tipo
@@ -3124,7 +3124,7 @@ class OtrosPedidoState(AtencionState):
         if not self.soap_id_atencion:
             self.oe_soap_valido = False
             return
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             at = session.exec(
                 select(Atencion).where(Atencion.id_atencion == self.soap_id_atencion)
             ).first()
@@ -3172,7 +3172,7 @@ class OtrosPedidoState(AtencionState):
             self.oe_error = "Seleccione el tipo y el examen."
             return
         try:
-            with Session(engine) as session:
+            with Session(get_engine()) as session:
                 nuevo = OtrosExamenesPedido(
                     lk_atencion=self.soap_id_atencion,
                     lk_catalogo=self.oe_sel_examen,
@@ -3198,7 +3198,7 @@ class OtrosPedidoState(AtencionState):
         self.oe_edit_sel_examen = fila["lk_cat"]
         self.oe_editando_fila = True
         self.oe_form_visible = False
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             cat = session.exec(
                 select(OtrosExamenesCatalogo)
                 .where(OtrosExamenesCatalogo.id_examen == fila["lk_cat"])
@@ -3217,7 +3217,7 @@ class OtrosPedidoState(AtencionState):
             self.oe_error = "Seleccione un examen."
             return
         try:
-            with Session(engine) as session:
+            with Session(get_engine()) as session:
                 pedido = session.exec(
                     select(OtrosExamenesPedido)
                     .where(OtrosExamenesPedido.id_examen_pedido == self.oe_edit_id)
@@ -3235,7 +3235,7 @@ class OtrosPedidoState(AtencionState):
 
     def oe_eliminar(self, id_pedido: int):
         try:
-            with Session(engine) as session:
+            with Session(get_engine()) as session:
                 pedido = session.exec(
                     select(OtrosExamenesPedido)
                     .where(OtrosExamenesPedido.id_examen_pedido == id_pedido)
@@ -3356,14 +3356,14 @@ class NuevaAlergiaState(State):
             self.naa_error = "No hay paciente seleccionado."
             return
         try:
-            with Session(engine) as s:
+            with Session(get_engine()) as s:
                 s.add(Alergia(
                     lk_paciente       = self.paciente_seleccionado[0],
                     sustancia_alergia = self.naa_sustancia.strip(),
                     fecha_reportada   = date.today(),
                 ))
                 s.commit()
-            with Session(engine) as s:
+            with Session(get_engine()) as s:
                 self.lista_alergias = listar_alergias_paciente(s, self.paciente_seleccionado[0])
             self.naa_dialog_open = False
         except Exception as e:
@@ -3465,7 +3465,7 @@ class CertificadoState(State):
         if not self.id_atencion_seleccionada:
             self.cert_dlg_sin_soap = True
             return
-        with Session(engine) as s:
+        with Session(get_engine()) as s:
             a = s.get(Atencion, self.id_atencion_seleccionada)
             if not a or not (a.subjetivo or "").strip():
                 self.cert_dlg_sin_soap = True
@@ -3476,7 +3476,7 @@ class CertificadoState(State):
 
     def cert_abrir_formulario_tardio(self, id_atencion: int):
         """Verifica SOAP y abre formulario para atención pasada."""
-        with Session(engine) as s:
+        with Session(get_engine()) as s:
             a = s.get(Atencion, id_atencion)
             if not a or not (a.subjetivo or "").strip():
                 self.cert_error        = "La atención seleccionada no tiene SOAP registrado."
@@ -3495,7 +3495,7 @@ class CertificadoState(State):
             self.cert_error = "Las fechas de reposo son obligatorias."
             return
         try:
-            with Session(engine) as s:
+            with Session(get_engine()) as s:
                 c = Certificado(
                     lk_atencion       = self.cert_id_atencion,
                     reposo_desde      = _date.fromisoformat(self.cert_reposo_desde),
@@ -3522,7 +3522,7 @@ class CertificadoState(State):
             self.cert_error = "Las fechas de reposo son obligatorias."
             return
         try:
-            with Session(engine) as s:
+            with Session(get_engine()) as s:
                 c = s.get(Certificado, self.cert_edit_id)
                 if c:
                     c.reposo_desde      = _date.fromisoformat(self.cert_reposo_desde)
@@ -3559,7 +3559,7 @@ class CertificadoState(State):
             self.cert_lista = []
             return
         lk_pac = self.paciente_seleccionado[0]
-        with Session(engine) as s:
+        with Session(get_engine()) as s:
             rows = s.execute(text(
                 "SELECT c.id_certificado, "
                 "       DATE_FORMAT(a.fecha_atencion,'%d/%m/%Y %H:%i') AS fecha_atencion_fmt, "
@@ -3595,7 +3595,7 @@ class CertificadoState(State):
                 self.cert_id_atencion      = c["lk_atencion"]
                 self._cert_reset_form()
                 # Recargar valores actuales desde DB
-                with Session(engine) as s:
+                with Session(get_engine()) as s:
                     r = s.get(Certificado, id_cert)
                     if r:
                         self.cert_reposo_desde      = str(r.reposo_desde)
@@ -4020,7 +4020,7 @@ class ConfigReportesState(State):
         ) + sorted(
             p.name for p in _tpl.glob("*.jpeg")
         )
-        with Session(engine) as s:
+        with Session(get_engine()) as s:
             rows = s.exec(
                 select(ReporteImpreso).order_by(ReporteImpreso.nombre_reporte)
             ).all()
@@ -4042,7 +4042,7 @@ class ConfigReportesState(State):
         self.cr_cargar_imagenes()
 
     def _cr_cargar_secciones(self):
-        with Session(engine) as s:
+        with Session(get_engine()) as s:
             rows = s.exec(
                 select(ReporteSeccion)
                 .where(ReporteSeccion.lk_impreso == self.cr_reporte_id)
@@ -4077,7 +4077,7 @@ class ConfigReportesState(State):
         self._cr_cargar_celdas()
 
     def _cr_cargar_celdas(self):
-        with Session(engine) as s:
+        with Session(get_engine()) as s:
             rows = s.exec(
                 select(ReporteCelda)
                 .where(ReporteCelda.lk_seccion == self.cr_seccion_id)
@@ -4112,7 +4112,7 @@ class ConfigReportesState(State):
     def cr_guardar_r(self):
         if not self.cr_edit_r_id:
             return
-        with Session(engine) as s:
+        with Session(get_engine()) as s:
             r = s.get(ReporteImpreso, self.cr_edit_r_id)
             if r:
                 r.nombre_reporte = self.cr_edit_r_nombre.strip()
@@ -4132,7 +4132,7 @@ class ConfigReportesState(State):
     def cr_crear_r(self):
         if not self.cr_nr_nombre.strip():
             return
-        with Session(engine) as s:
+        with Session(get_engine()) as s:
             s.add(ReporteImpreso(
                 nombre_reporte=self.cr_nr_nombre.strip(),
                 explica=self.cr_nr_explica.strip(),
@@ -4174,7 +4174,7 @@ class ConfigReportesState(State):
     def cr_guardar_s(self):
         if not self.cr_edit_s_id:
             return
-        with Session(engine) as s:
+        with Session(get_engine()) as s:
             sec = s.get(ReporteSeccion, self.cr_edit_s_id)
             if sec:
                 sec.orden                = self.cr_edit_s_orden
@@ -4229,7 +4229,7 @@ class ConfigReportesState(State):
         self.cr_dlg_nueva_s      = True
 
     def cr_crear_s(self):
-        with Session(engine) as s:
+        with Session(get_engine()) as s:
             s.add(ReporteSeccion(
                 lk_impreso           = self.cr_reporte_id,
                 orden                = self.cr_ns_orden,
@@ -4272,7 +4272,7 @@ class ConfigReportesState(State):
         self.cr_dlg_nueva_c = True
 
     def cr_crear_c(self):
-        with Session(engine) as s:
+        with Session(get_engine()) as s:
             s.add(ReporteCelda(
                 lk_seccion = self.cr_seccion_id,
                 variable   = self.cr_nc_variable.strip() or None,
@@ -4344,7 +4344,7 @@ class ConfigReportesState(State):
             f"{self.cr_fmt_size:02d}.{self.cr_fmt_merge_h:02d}.{self.cr_fmt_merge_v:02d}"
             f".{self.cr_fmt_sombra:02d}.{self.cr_fmt_efecto}{self.cr_fmt_alin_h}{self.cr_fmt_alin_v}.{brd}.{nl}"
         )
-        with Session(engine) as s:
+        with Session(get_engine()) as s:
             c = s.get(ReporteCelda, self.cr_celda_edit_id)
             if c:
                 c.formato    = fmt
@@ -4368,7 +4368,7 @@ class ConfigReportesState(State):
         if not self.cr_reporte_id:
             self.cr_imagenes = []
             return
-        with Session(engine) as s:
+        with Session(get_engine()) as s:
             rows = s.exec(
                 select(ReporteImagen)
                 .where(ReporteImagen.lk_impreso == self.cr_reporte_id)
@@ -4393,7 +4393,7 @@ class ConfigReportesState(State):
     def cr_crear_img(self):
         if not self.cr_reporte_id or not self.cr_ni_celda.strip() or not self.cr_ni_archivo:
             return
-        with Session(engine) as s:
+        with Session(get_engine()) as s:
             s.add(ReporteImagen(
                 lk_impreso=self.cr_reporte_id,
                 nombre_archivo=self.cr_ni_archivo,
@@ -4421,7 +4421,7 @@ class ConfigReportesState(State):
     def cr_guardar_edicion_img(self):
         if not self.cr_ei_celda.strip() or not self.cr_ei_archivo:
             return
-        with Session(engine) as s:
+        with Session(get_engine()) as s:
             r = s.get(ReporteImagen, self.cr_ei_id)
             if r:
                 r.nombre_archivo = self.cr_ei_archivo
@@ -4445,7 +4445,7 @@ class ConfigReportesState(State):
         tipo = self.cr_borrar_tipo
         bid  = self.cr_borrar_id
         if tipo == "reporte":
-            with Session(engine) as s:
+            with Session(get_engine()) as s:
                 r = s.get(ReporteImpreso, bid)
                 if r: s.delete(r); s.commit()
             if self.cr_reporte_id == bid:
@@ -4455,7 +4455,7 @@ class ConfigReportesState(State):
                 self.cr_sql_display = ""
             self.cr_cargar_reportes()
         elif tipo == "seccion":
-            with Session(engine) as s:
+            with Session(get_engine()) as s:
                 celdas = s.exec(select(ReporteCelda).where(ReporteCelda.lk_seccion == bid)).all()
                 for c in celdas:
                     s.delete(c)
@@ -4468,7 +4468,7 @@ class ConfigReportesState(State):
                 self.cr_sql_display = ""
             self._cr_cargar_secciones()
         elif tipo == "celda":
-            with Session(engine) as s:
+            with Session(get_engine()) as s:
                 r = s.get(ReporteCelda, bid)
                 if r: s.delete(r); s.commit()
             if self.cr_celda_edit_id == bid:
@@ -4477,7 +4477,7 @@ class ConfigReportesState(State):
                 self.cr_celda_sel_id = 0
             self._cr_cargar_celdas()
         elif tipo == "imagen":
-            with Session(engine) as s:
+            with Session(get_engine()) as s:
                 r = s.get(ReporteImagen, bid)
                 if r: s.delete(r); s.commit()
             self.cr_cargar_imagenes()
@@ -4495,7 +4495,7 @@ class ConfigReportesState(State):
     def cr_aplicar_pegar_fmt(self):
         if len(self.cr_pegar_fmt_string) != 22:
             return
-        with Session(engine) as s:
+        with Session(get_engine()) as s:
             c = s.get(ReporteCelda, self.cr_pegar_fmt_id)
             if c:
                 c.formato = self.cr_pegar_fmt_string
@@ -4521,7 +4521,7 @@ class ConfigReportesState(State):
                 origen_name  = s.explica
             if s.id == self.cr_clonar_dest_id:
                 destino_name = s.explica
-        with Session(engine) as s:
+        with Session(get_engine()) as s:
             celdas = s.exec(
                 select(ReporteCelda).where(ReporteCelda.lk_seccion == self.cr_seccion_id)
             ).all()
@@ -4555,7 +4555,7 @@ class ConfigReportesState(State):
             if sec.id == self.cr_seccion_id:
                 explica = sec.explica
                 break
-        with Session(engine) as s:
+        with Session(get_engine()) as s:
             celdas = s.exec(
                 select(ReporteCelda).where(ReporteCelda.lk_seccion == self.cr_seccion_id)
             ).all()
@@ -4575,7 +4575,7 @@ class ConfigReportesState(State):
             if sec.id == self.cr_seccion_id:
                 explica = sec.explica
                 break
-        with Session(engine) as s:
+        with Session(get_engine()) as s:
             celdas = s.exec(
                 select(ReporteCelda).where(ReporteCelda.lk_seccion == self.cr_seccion_id)
             ).all()
@@ -4676,7 +4676,7 @@ class AgendaState(State):
         from sqlmodel import Session
         self.ag_nc_lk_tipo = int(v) if v else 0
         if self.ag_nc_lk_tipo:
-            with Session(engine) as s:
+            with Session(get_engine()) as s:
                 t = s.get(TipoCita, self.ag_nc_lk_tipo)
                 if t and t.duracion_min:
                     self.ag_nc_duracion = _snap_duracion(t.duracion_min)
@@ -4720,7 +4720,7 @@ class AgendaState(State):
 
     # ── Carga de datos ────────────────────────────────────────────────────────
     def _ag_cargar_medicos(self):
-        with Session(engine) as s:
+        with Session(get_engine()) as s:
             medicos = s.exec(
                 select(Points).where(Points.estado == 1)
             ).all()
@@ -4736,7 +4736,7 @@ class AgendaState(State):
         ]
 
     def _ag_cargar_tipos(self):
-        with Session(engine) as s:
+        with Session(get_engine()) as s:
             tipos = s.exec(
                 select(TipoCita).where(TipoCita.es_activo == 1)
                 .order_by(TipoCita.categoria, TipoCita.nombre)
@@ -4765,7 +4765,7 @@ class AgendaState(State):
         else:
             filtro_sql = ""
         params: dict = {}
-        with Session(engine) as s:
+        with Session(get_engine()) as s:
             rows = s.execute(text(f"""
                 SELECT c.id_cita,
                        c.lk_paciente,
@@ -4833,7 +4833,7 @@ class AgendaState(State):
 
     def _ag_buscar_pacientes(self, filtro: str):
         resultados = consultar_pacientes_por_nombre(
-            Session(engine), filtro, self.id_medico, self.ve_solo_propios_pacientes
+            Session(get_engine()), filtro, self.id_medico, self.ve_solo_propios_pacientes
         )
         self.ag_nc_resultados_px = [
             {"id": r["nro_hclinica"], "nombre": r["nombre_completo"]}
@@ -4916,7 +4916,7 @@ class AgendaState(State):
         try:
             ini = _dt.fromisoformat(data["start"].replace("Z", ""))
             fin = _dt.fromisoformat(data["end"].replace("Z", ""))
-            with Session(engine) as s:
+            with Session(get_engine()) as s:
                 cita = s.get(Cita, id_cita)
                 if cita:
                     cita.inicio = ini
@@ -4943,7 +4943,7 @@ class AgendaState(State):
         if not self.ag_ed_lk_medico or not self.ag_ed_lk_tipo:
             self.ag_ed_error = "Médico y tipo de cita son obligatorios."
             return
-        with Session(engine) as s:
+        with Session(get_engine()) as s:
             c = s.get(Cita, self.ag_ver_id)
             if not c:
                 self.ag_ed_error = "No se encontró la cita."
@@ -4968,7 +4968,7 @@ class AgendaState(State):
     def ag_confirmar_cita(self):
         if not self.ag_ver_id:
             return
-        with Session(engine) as s:
+        with Session(get_engine()) as s:
             c = s.get(Cita, self.ag_ver_id)
             if c:
                 c.estado = "CONFIRMADA"
@@ -4979,7 +4979,7 @@ class AgendaState(State):
     def ag_cancelar_cita(self):
         if not self.ag_ver_id:
             return
-        with Session(engine) as s:
+        with Session(get_engine()) as s:
             c = s.get(Cita, self.ag_ver_id)
             if c:
                 c.estado = "CANCELADA"
@@ -5009,7 +5009,7 @@ class AgendaState(State):
             from datetime import timedelta
             ini = _dt.fromisoformat(self.ag_nc_inicio.replace("Z", ""))
             fin = ini + timedelta(minutes=self.ag_nc_duracion)
-            with Session(engine) as s:
+            with Session(get_engine()) as s:
                 nueva = Cita(
                     lk_paciente  = self.ag_nc_lk_paciente or None,
                     lk_medico    = self.ag_nc_lk_medico,
@@ -5199,7 +5199,7 @@ class ResultadosState(AtencionState):
         lk_at = self.soap_id_atencion or self.id_atencion_seleccionada
         if nro <= 0:
             return
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             self.ri_sin_clasificar = cargar_imagenes_sin_clasificar(session, lk_at)
             self.ri_resultados     = cargar_resultados_imagen_paciente(session, nro)
             if self.ri_rama_abierta:
@@ -5223,7 +5223,7 @@ class ResultadosState(AtencionState):
             self.ri_imagenes_rama = []
         else:
             self.ri_rama_abierta = id_resultado
-            with Session(engine) as session:
+            with Session(get_engine()) as session:
                 self.ri_imagenes_rama = cargar_imagenes_resultado(session, id_resultado)
 
     # ── Upload ───────────────────────────────────────────────────────────────
@@ -5254,7 +5254,7 @@ class ResultadosState(AtencionState):
                     paginas = [normalizar_a_jpg(datos, mime)]
                 else:
                     paginas = [datos]   # ya es JPG
-                with Session(engine) as session:
+                with Session(get_engine()) as session:
                     for jpg in paginas:
                         id_img = rq_insertar_imagen(session, lk_at)
                         try:
@@ -5275,7 +5275,7 @@ class ResultadosState(AtencionState):
         self.ri_opcion_sel       = ""
         self.ri_show_crear       = False
         nro = self.nro_hclinica_seleccionado
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             resultados = cargar_resultados_imagen_paciente(session, nro)
             self.ri_opciones_res = [
                 {"id": str(r["id_resultado"]),
@@ -5309,7 +5309,7 @@ class ResultadosState(AtencionState):
         if not val or val == "__nuevo__":
             return
         id_resultado = int(val)
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             imagenes     = cargar_imagenes_resultado(session, id_resultado)
             siguiente    = len(imagenes)
             asignar_imagen_a_resultado(
@@ -5332,7 +5332,7 @@ class ResultadosState(AtencionState):
             fecha = _dt.date.fromisoformat(self.ri_crear_fecha) if self.ri_crear_fecha else _dt.date.today()
         except ValueError:
             fecha = _dt.date.today()
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             id_resultado = crear_resultado_imagen(
                 session, nro, lk_examen, fecha,
                 alias     = self.ri_crear_alias.strip(),
@@ -5348,34 +5348,34 @@ class ResultadosState(AtencionState):
 
     def ri_subir_imagen(self, id_resultado: int, id_imagen: int):
         """Intercambia la imagen con su predecesora en orden."""
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             imgs = cargar_imagenes_resultado(session, id_resultado)
         idx = next((i for i, im in enumerate(imgs) if im["id_imagen"] == id_imagen), None)
         if idx is None or idx == 0:
             return
         ids = [im["id_imagen"] for im in imgs]
         ids[idx - 1], ids[idx] = ids[idx], ids[idx - 1]
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             rq_reordenar(session, id_resultado, ids)
         self.ri_recargar()
 
     def ri_bajar_imagen(self, id_resultado: int, id_imagen: int):
         """Intercambia la imagen con su sucesora en orden."""
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             imgs = cargar_imagenes_resultado(session, id_resultado)
         idx = next((i for i, im in enumerate(imgs) if im["id_imagen"] == id_imagen), None)
         if idx is None or idx >= len(imgs) - 1:
             return
         ids = [im["id_imagen"] for im in imgs]
         ids[idx], ids[idx + 1] = ids[idx + 1], ids[idx]
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             rq_reordenar(session, id_resultado, ids)
         self.ri_recargar()
 
     # ── Eliminar imagen ──────────────────────────────────────────────────────
 
     def ri_eliminar(self, id_imagen: int):
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             datos = rq_eliminar_imagen(session, id_imagen)
         if datos and datos["nro_hclinica"] and datos["lk_atencion"]:
             img_eliminar(datos["nro_hclinica"], datos["lk_atencion"], datos["id_imagen"])
@@ -5410,7 +5410,7 @@ class ResultadosState(AtencionState):
         from .utils.imagen_utils import ruta_completa
         self.ri_grabar_rama_id = id_resultado
         self.ri_grabar_msg     = "Verificando…"
-        with Session(engine) as s:
+        with Session(get_engine()) as s:
             resultado = s.get(ResultadosImagenes, id_resultado)
             if not resultado:
                 self.ri_grabar_msg = "Error: resultado no encontrado."
@@ -5458,7 +5458,7 @@ class ResultadosState(AtencionState):
         if self.ri_borrar_codigo_input.strip().upper() != self.ri_borrar_codigo_esperado:
             return
         id_resultado = self.ri_borrar_resultado_id
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             datos_fisicos = rq_eliminar_resultado_imagen(session, id_resultado)
         for d in datos_fisicos:
             try:
@@ -5506,7 +5506,7 @@ class ResultadosState(AtencionState):
     def ri_guardar_nueva_marca(self):
         if not self.puede_escribir_paciente_actual:
             return
-        with Session(engine) as s:
+        with Session(get_engine()) as s:
             rq_guardar_marca(
                 s,
                 id_imagen   = self.ri_id_imagen_activa,
@@ -5529,7 +5529,7 @@ class ResultadosState(AtencionState):
     def ri_eliminar_marca_item(self, id_marca: int):
         if not self.puede_escribir_paciente_actual:
             return
-        with Session(engine) as s:
+        with Session(get_engine()) as s:
             rq_eliminar_marca(s, id_marca)
             self.ri_marcas = cargar_marcas(s, self.ri_id_imagen_activa)
 
@@ -5550,7 +5550,7 @@ class ResultadosState(AtencionState):
     def ri_guardar_edicion_marca(self):
         if not self.puede_escribir_paciente_actual:
             return
-        with Session(engine) as s:
+        with Session(get_engine()) as s:
             rq_actualizar_marca(s, self.ri_edit_id,
                                 color=self.ri_nv_color,
                                 font=self.ri_nv_font,
@@ -5574,7 +5574,7 @@ class ResultadosState(AtencionState):
         self.ri_zoom_nivel  = 1  # reset a 100% al cambiar de imagen
         self.ri_herramienta = ""
         self.ri_nv_open     = False
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             self.ri_marcas = cargar_marcas(session, id_imagen)
             if id_resultado:
                 self.ri_imgs_activas = cargar_imagenes_resultado(session, id_resultado)
@@ -5614,7 +5614,7 @@ class ResultadosState(AtencionState):
         if not self.ri_id_imagen_activa:
             return
         nueva_rot = (self._ri_rotacion_activa() + 90) % 360
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             rq_actualizar_rotacion(session, self.ri_id_imagen_activa, nueva_rot)
         self.ri_recargar()
 
@@ -5672,7 +5672,7 @@ class LaboratorioState(AtencionState):
 
     def lab_abrir(self, imagen_id: int = 0):
         import datetime as _dt
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             self.lab_catalogo = cargar_catalogo_completo_lab(session)
         self.lab_fecha         = _dt.date.today().isoformat()
         self.lab_fila_counter  = 0
@@ -5752,7 +5752,7 @@ class LaboratorioState(AtencionState):
         self.lab_guardando = True
         self.lab_error     = ""
         try:
-            with Session(engine) as session:
+            with Session(get_engine()) as session:
                 for f in filas_validas:
                     try:
                         valor_num = float(f["valor"])
@@ -5783,7 +5783,7 @@ class LaboratorioState(AtencionState):
         nro = self.nro_hclinica_seleccionado
         if nro <= 0:
             return
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             self.lab_h_filas = cargar_historial_lab(session, nro)
         self.lab_h_exp_g = []
         self.lab_h_exp_e = []
@@ -5828,7 +5828,7 @@ class LaboratorioState(AtencionState):
         self.offcanvas_resultados_examenes = False
         nro = self.nro_hclinica_seleccionado
         if nro > 0:
-            with Session(engine) as session:
+            with Session(get_engine()) as session:
                 self.lab_h_filas = cargar_historial_lab(session, nro)
                 self.sv_h_filas  = cargar_historial_sv(session, nro)
         self.lab_h_exp_g       = []
@@ -5849,7 +5849,7 @@ class LaboratorioState(AtencionState):
         nro = self.nro_hclinica_seleccionado
         if nro <= 0:
             return
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             self.sv_h_filas = cargar_historial_sv(session, nro)
         self.sv_h_exp = []
 
@@ -6097,6 +6097,11 @@ class AdminUsuariosState(State):
     au_dlg_nuevo: bool = False
     au_dlg_editar: bool = False
     au_dlg_password: bool = False
+    au_dlg_base: bool = False
+
+    # Cambio de base de datos (LIMPIA / MIGRADA)
+    au_base_destino: str = ""
+    au_base_error: str = ""
 
     # Feedback
     au_error: str = ""
@@ -6105,6 +6110,14 @@ class AdminUsuariosState(State):
     @rx.var
     def au_roles(self) -> list[str]:
         return ["SECRETARIA", "MEDICO_CONSULTA", "MEDICO_ATENCION", "ADMIN"]
+
+    @rx.var
+    def au_base_actual(self) -> str:
+        return base_actual()
+
+    @rx.var
+    def au_base_migrada_disponible(self) -> bool:
+        return base_migrada_disponible()
 
     # ── Setters para formulario nuevo ─────────────────────────────────────────
     def set_au_n_nombre(self, v: str):       self.au_n_nombre      = v
@@ -6137,11 +6150,12 @@ class AdminUsuariosState(State):
     def set_au_dlg_nuevo(self, v: bool):     self.au_dlg_nuevo     = v
     def set_au_dlg_editar(self, v: bool):    self.au_dlg_editar    = v
     def set_au_dlg_password(self, v: bool):  self.au_dlg_password  = v
+    def set_au_dlg_base(self, v: bool):      self.au_dlg_base      = v
 
     def au_cargar(self):
         if not self.puede_admin:
             return
-        with Session(engine) as s:
+        with Session(get_engine()) as s:
             self.au_lista = listar_usuarios(s)
 
     # ── Nuevo usuario ─────────────────────────────────────────────────────────
@@ -6182,7 +6196,7 @@ class AdminUsuariosState(State):
             self.au_error = "Las contraseñas no coinciden."
             return
         try:
-            with Session(engine) as s:
+            with Session(get_engine()) as s:
                 crear_usuario(
                     s,
                     nombre=self.au_n_nombre.strip(),
@@ -6242,7 +6256,7 @@ class AdminUsuariosState(State):
             self.au_error = "El nombre de usuario es obligatorio."
             return
         try:
-            with Session(engine) as s:
+            with Session(get_engine()) as s:
                 actualizar_usuario(
                     s,
                     id_medico=self.au_edit_id,
@@ -6276,7 +6290,7 @@ class AdminUsuariosState(State):
         lectura_u   = "P" if len(permisos_u) > 1 and permisos_u[1] == "P" else "T"
         escritura_u = "P" if len(permisos_u) > 2 and permisos_u[2] == "P" else "T"
         try:
-            with Session(engine) as s:
+            with Session(get_engine()) as s:
                 actualizar_usuario(
                     s,
                     id_medico=id_medico,
@@ -6325,7 +6339,7 @@ class AdminUsuariosState(State):
             self.au_error = "Las contraseñas no coinciden."
             return
         try:
-            with Session(engine) as s:
+            with Session(get_engine()) as s:
                 resetear_clave(s, self.au_p_id, self.au_p_clave)
         except Exception as e:
             self.au_error = f"Error: {str(e)}"
@@ -6336,3 +6350,36 @@ class AdminUsuariosState(State):
 
     def au_cerrar_ok(self):
         self.au_ok = ""
+
+    # ── Cambio de base de datos (LIMPIA / MIGRADA) ───────────────────────────
+
+    def au_abrir_cambiar_base(self, destino: str):
+        if not self.puede_admin:
+            return
+        destino = destino.upper()
+        if destino == base_actual():
+            return
+        if destino == "MIGRADA" and not base_migrada_disponible():
+            self.au_base_error = "La base MIGRADA no está configurada (GESMED_DB_URL_M)."
+            return
+        self.au_base_destino = destino
+        self.au_base_error = ""
+        self.au_dlg_base = True
+
+    def au_cancelar_cambiar_base(self):
+        self.au_dlg_base = False
+        self.au_base_error = ""
+
+    def au_confirmar_cambiar_base(self):
+        if not self.puede_admin:
+            return
+        try:
+            cambiar_base(self.au_base_destino)
+        except Exception as e:
+            self.au_base_error = f"Error: {str(e)}"
+            return
+        self.au_dlg_base = False
+        self.au_base_error = ""
+        # Recarga forzada de esta sesión: evita que quede información en
+        # memoria (State ya instanciado) proveniente de la base anterior.
+        yield rx.call_script("window.location.replace('/')")

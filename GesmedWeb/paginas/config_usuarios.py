@@ -365,6 +365,84 @@ def _dlg_editar() -> rx.Component:
     )
 
 
+# ── Diálogo: Cambiar base de datos ────────────────────────────────────────────
+def _dlg_base() -> rx.Component:
+    return rx.dialog.root(
+        rx.dialog.content(
+            rx.dialog.title("Cambiar Base de Datos", font_size="14px", font_weight="700"),
+            rx.vstack(
+                rx.text(
+                    "Se cambiará la base activa a ",
+                    rx.text.span(AdminUsuariosState.au_base_destino, font_weight="700"),
+                    ". Esta acción cierra la sesión actual (se recargará la "
+                    "página) para evitar mezclar información con la base "
+                    "anterior. Es una operación administrativa excepcional.",
+                    font_size="12px", color="var(--gray-11)",
+                ),
+                rx.cond(
+                    AdminUsuariosState.au_base_error != "",
+                    rx.text(AdminUsuariosState.au_base_error,
+                            font_size="11px", color="var(--red-9)"),
+                ),
+                rx.hstack(
+                    rx.dialog.close(
+                        rx.button("Cancelar", variant="soft", color_scheme="gray",
+                                  type="button", size="2",
+                                  on_click=AdminUsuariosState.au_cancelar_cambiar_base),
+                    ),
+                    rx.spacer(),
+                    rx.button("Confirmar Cambio", color_scheme="red",
+                              type="button", size="2",
+                              on_click=AdminUsuariosState.au_confirmar_cambiar_base),
+                    width="100%",
+                ),
+                spacing="3", width="100%",
+            ),
+            max_width="420px",
+        ),
+        open=AdminUsuariosState.au_dlg_base,
+        on_open_change=AdminUsuariosState.set_au_dlg_base,
+    )
+
+
+# ── Sección: Base de datos activa ─────────────────────────────────────────────
+def _seccion_base() -> rx.Component:
+    def _boton_base(nombre: str) -> rx.Component:
+        es_actual = AdminUsuariosState.au_base_actual == nombre
+        deshabilitado = rx.cond(
+            nombre == "MIGRADA",
+            ~AdminUsuariosState.au_base_migrada_disponible,
+            False,
+        )
+        return rx.button(
+            rx.cond(es_actual, rx.icon("circle-check", size=13), rx.icon("database", size=13)),
+            nombre,
+            on_click=AdminUsuariosState.au_abrir_cambiar_base(nombre),
+            variant=rx.cond(es_actual, "solid", "soft"),
+            color_scheme=rx.cond(es_actual, "green", "gray"),
+            disabled=rx.cond(es_actual, True, deshabilitado),
+            size="2", type="button",
+        )
+
+    return rx.box(
+        rx.vstack(
+            rx.text("Base de Datos", font_size="13px", font_weight="600",
+                    color="var(--gray-12)"),
+            rx.hstack(
+                rx.text("Activa:", font_size="12px", color="var(--gray-10)"),
+                rx.badge(AdminUsuariosState.au_base_actual, color_scheme="green"),
+                rx.spacer(),
+                _boton_base("LIMPIA"),
+                _boton_base("MIGRADA"),
+                spacing="3", align="center", width="100%",
+            ),
+            spacing="2", width="100%",
+        ),
+        border="1px solid var(--gray-4)", border_radius="8px",
+        padding="14px 16px", width="100%",
+    )
+
+
 # ── Diálogo: Resetear contraseña ──────────────────────────────────────────────
 def _dlg_password() -> rx.Component:
     return rx.dialog.root(
@@ -424,6 +502,7 @@ def config_usuarios() -> rx.Component:
             _dlg_nuevo(),
             _dlg_editar(),
             _dlg_password(),
+            _dlg_base(),
             # Toast de éxito
             rx.cond(
                 AdminUsuariosState.au_ok != "",
@@ -446,6 +525,7 @@ def config_usuarios() -> rx.Component:
             # Contenido
             rx.box(
                 rx.vstack(
+                    _seccion_base(),
                     # Encabezado de sección + botón Nuevo
                     rx.hstack(
                         rx.text("Cuentas de Usuario", font_size="13px",

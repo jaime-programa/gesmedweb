@@ -13,15 +13,75 @@ from ..modelos.mis_modelos import (
 )
 from decimal import Decimal
 from ..crypto import GesmedCrypto
+from ..utils.config import leer_config, escribir_config
 import datetime
 import os
 
-_URL_GESMED  = os.environ.get("GESMED_DB_URL",  "mysql+pymysql://med_admin:gesmed01@localhost:3306/gesmed")
+_URL_GESMED   = os.environ.get("GESMED_DB_URL",   "mysql+pymysql://med_admin:gesmed01@localhost:3306/gesmed")
+_URL_GESMED_M = os.environ.get("GESMED_DB_URL_M", "")
 
-engine = create_engine(_URL_GESMED, echo=False, pool_pre_ping=True)
+# ── Hotswap de base de datos (LIMPIA / MIGRADA) ───────────────────────────────
+# _base_actual vive en memoria y solo cambia cuando el admin invoca
+# cambiar_base() desde la UI — get_engine() NUNCA relee configuracion.txt en
+# el camino caliente de una consulta, así que no hay costo de I/O por request.
+# configuracion.txt solo conserva la última base usada para que, si el
+# proceso se reinicia, arranque recordando cuál estaba activa.
+_engines: dict[str, "Engine"] = {}
+_base_actual: str = (leer_config("BASE") or "LIMPIA").upper()
+
+
+def _url_para_base(base: str) -> str:
+    if base == "MIGRADA":
+        if not _URL_GESMED_M:
+            raise EnvironmentError(
+                "GESMED_DB_URL_M no está configurada; no se puede usar la base MIGRADA."
+            )
+        return _URL_GESMED_M
+    return _URL_GESMED
+
+
+def get_engine():
+    """Engine de la base actualmente activa (LIMPIA o MIGRADA). Cacheado por
+    base — el create_engine() real solo ocurre la primera vez que se usa
+    cada una."""
+    if _base_actual not in _engines:
+        _engines[_base_actual] = create_engine(
+            _url_para_base(_base_actual), echo=False, pool_pre_ping=True
+        )
+    return _engines[_base_actual]
+
+
+def base_actual() -> str:
+    return _base_actual
+
+
+def base_migrada_disponible() -> bool:
+    return bool(_URL_GESMED_M)
+
+
+def cambiar_base(nueva_base: str) -> None:
+    """Cambia en caliente (sin reiniciar el proceso) cuál base de datos usa
+    toda la app. Debe invocarse solo desde una acción administrativa
+    explícita (menú de configuración del admin) — es una operación
+    excepcional, no un toggle rutinario: otros clientes conectados en ese
+    momento no se recargan automáticamente (limitación de Reflex 0.9.x, sin
+    broadcast a todas las sesiones)."""
+    global _base_actual
+    nueva_base = nueva_base.upper()
+    if nueva_base not in ("LIMPIA", "MIGRADA"):
+        raise ValueError(f"Base desconocida: {nueva_base!r}")
+    if nueva_base == _base_actual:
+        return
+    _url_para_base(nueva_base)  # valida que la URL exista antes de cambiar
+    anterior = _engines.pop(_base_actual, None)
+    _base_actual = nueva_base
+    escribir_config("BASE", nueva_base)
+    if anterior is not None:
+        anterior.dispose()
+
 
 def carga_medicos():
-    with Session(engine) as session:
+    with Session(get_engine()) as session:
         statement=select(Points.id_medico,Points.nombre_medico,Points.especialidad,Points.cod_especialidad,Points.celular,Points.email,Points.permisos).where(Points.estado==1)
         resultados=session.exec(statement).all()
         medicos={r.id_medico:[r.nombre_medico,r.especialidad,r.cod_especialidad,r.celular,r.email,r.permisos] 
@@ -29,7 +89,7 @@ def carga_medicos():
     return medicos
 
 def carga_seguros() -> list[str]:
-    with Session(engine) as session:
+    with Session(get_engine()) as session:
         statement = select(SeguroMedico.nombre_seguro).where(SeguroMedico.esta_activo == 1).order_by(SeguroMedico.nombre_seguro)
         return session.exec(statement).all()
 
@@ -202,7 +262,7 @@ def diagnosticos_vinculados_a_atencion(session, id_atencion: int) -> list:
 
 
 def actualiza_vistas():
-    with Session(engine) as session:
+    with Session(get_engine()) as session:
         session.exec(
             """
             CREATE OR REPLACE VIEW cuantas_consultas AS

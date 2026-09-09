@@ -21,7 +21,7 @@ from .paginas.config_usuarios import config_usuarios
 import unicodedata
 from sqlalchemy import text
 from sqlmodel import Session, select
-from .state import State, ConfigReportesState, AdminUsuariosState, engine
+from .state import State, ConfigReportesState, AdminUsuariosState, get_engine
 from .modelos.mis_modelos import OtrosExamenesTipo, Imagenes, Atencion, ResultadosImagenes
 from .utils.imagen_utils import leer_imagen as img_leer
 from .reportes.motor import generar_reporte, generar_reporte_multisheet
@@ -30,7 +30,7 @@ from .reportes.motor import generar_reporte, generar_reporte_multisheet
 def _slug_tipo(lk_tipo: int) -> str:
     if not lk_tipo:
         return ""
-    with Session(engine) as s:
+    with Session(get_engine()) as s:
         tipo = s.exec(
             select(OtrosExamenesTipo).where(OtrosExamenesTipo.id_examen_tipo == lk_tipo)
         ).first()
@@ -42,7 +42,7 @@ def _slug_tipo(lk_tipo: int) -> str:
 
 def _tipos_en_atencion(lk_atencion: int) -> list[tuple[int, str]]:
     """Devuelve [(id_tipo, nombre_tipo), ...] para los tipos presentes en el pedido."""
-    with Session(engine) as s:
+    with Session(get_engine()) as s:
         rows = s.execute(text("""
             SELECT DISTINCT et.id_examen_tipo, et.examen_tipo
             FROM examen_pedido ep
@@ -78,11 +78,11 @@ async def _descargar_reporte(request: Request) -> StreamingResponse:
     if nombre_reporte == "pedido_examen" and contexto["lk_tipo"] == 0:
         tipos = _tipos_en_atencion(contexto["lk_atencion"])
         if len(tipos) > 1:
-            output, _ = generar_reporte_multisheet(nombre_reporte, contexto, tipos, engine)
+            output, _ = generar_reporte_multisheet(nombre_reporte, contexto, tipos, get_engine())
         else:
-            output = generar_reporte(nombre_reporte, contexto, engine)
+            output = generar_reporte(nombre_reporte, contexto, get_engine())
     else:
-        output = generar_reporte(nombre_reporte, contexto, engine)
+        output = generar_reporte(nombre_reporte, contexto, get_engine())
 
     slug     = _slug_tipo(contexto["lk_tipo"])
     sufijo   = f"_{slug}" if slug else ""
@@ -99,7 +99,7 @@ app._api.add_route("/reporte/{nombre_reporte}", _descargar_reporte, methods=["GE
 # GET /imagen/{id_imagen}
 async def _servir_imagen(request: Request) -> Response:
     id_imagen = int(request.path_params["id_imagen"])
-    with Session(engine) as session:
+    with Session(get_engine()) as session:
         img = session.get(Imagenes, id_imagen)
         if not img:
             return Response(status_code=404)
