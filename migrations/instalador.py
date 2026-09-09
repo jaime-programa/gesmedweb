@@ -168,10 +168,14 @@ def paso_pedir_credenciales_app(host: str, port: str) -> dict:
 
 
 def paso_crear_base_y_usuario(admin: dict, db_name: str, app_user: str, app_password: str) -> bool:
+    # CREATE USER IF NOT EXISTS no actualiza la contraseña si la cuenta ya existía
+    # de una corrida anterior (p.ej. tras reintentar por otro error) — el ALTER
+    # USER siguiente la sincroniza siempre con lo que el operador acaba de teclear.
     sql = (
         f"CREATE DATABASE IF NOT EXISTS `{db_name}` "
         f"CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci; "
         f"CREATE USER IF NOT EXISTS '{app_user}'@'%' IDENTIFIED BY '{app_password}'; "
+        f"ALTER USER '{app_user}'@'%' IDENTIFIED BY '{app_password}'; "
         f"GRANT ALL PRIVILEGES ON `{db_name}`.* TO '{app_user}'@'%'; "
         f"FLUSH PRIVILEGES;"
     )
