@@ -86,6 +86,24 @@ class Diagnostico(SQLModel,table=True):
      # Relación con CIE10
     #cie10: Optional[Cie10] = Relationship(back_populates="diagnosticos")
 
+class SolicitudInterconsulta(SQLModel,table=True):
+    __tablename__='solicitud_interconsulta'
+    id_solicitud:       Optional[int] | None = Field(default=None, primary_key=True)
+    lk_paciente:        int = Field(foreign_key="paciente.nro_hclinica")
+    lk_medico_principal: int = Field(foreign_key="points.id_medico")
+    lk_medico_auxiliar:  int = Field(foreign_key="points.id_medico")
+    fecha_solicitud:    datetime.date
+    fecha_expiracion:   datetime.date
+    motivo:             str = Field(sa_column=Column(Text, nullable=False))
+    estatus:            str = Field(default="activa", max_length=10)
+
+class Interconsulta(SQLModel,table=True):
+    __tablename__='interconsulta'
+    id_interconsulta: Optional[int] | None = Field(default=None, primary_key=True)
+    lk_atencion:        int = Field(foreign_key="atencion.id_atencion")
+    lk_medico_auxiliar: int = Field(foreign_key="points.id_medico")
+    reporte_final:      Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
+
 class Rel_atencion_diagnostico(SQLModel,table=True):
     __tablename__='rel_atencion_diagnostico'
     id_relacion: Optional[int] | None=Field(default=None,primary_key=True)

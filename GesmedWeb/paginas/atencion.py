@@ -18,7 +18,7 @@ from ..componentes.dialogos import (
     dialogo_editar_item_prescripcion, dialogo_nuevo_medicamento_px,
     dlg_mantenimiento_medicamentos,
     panel_prescripcion_historica, dialogo_advertencia_salir,
-    dialogo_datos_paciente, offcanvas_menu,
+    dialogo_datos_paciente, offcanvas_menu, dialogo_solicitar_interconsulta,
     dialogo_nuevo_ant_familiar,
     dialogo_nueva_alergia,
     dialogo_cert_sin_soap,
@@ -51,58 +51,48 @@ def navbar():
                     rx.hstack(
                         rx.button("☰", cursor="pointer", variant="surface", font_size="14px",
                                   on_click=AtencionState.toggle_offcanvas_menu, type="button", height="33px"),
-                        ##Boton mostrar/ocultar panel de historial
-                        #rx.button(
-                        #    rx.icon(
-                        #        rx.cond(State.show_panel_izq, "panel-left-close", "panel-left-open"),
-                        #        size=16,
-                        #    ),
-                        #    on_click=State.toggle_panel_izq,
-                        #    variant="surface",
-                        #    type="button",
-                        #    height="33px",
-                        #    title="Mostrar/Ocultar Panel de Historial",
-                        #    cursor="pointer",
-                        #),
                         rx.button("✏️", cursor="pointer", variant="surface", font_size="12px",
                                   on_click=EditPacienteState.abrir_datos_paciente, type="button", height="33px"),
                         spacing="1",
                     ),
                     position="absolute",
-                    top="11px",
+                    top="3px",
                     border_radius="4px",
                 ),
                 rx.box(
-                    rx.flex(
-                        # Historia Clinica
-                        rx.text('# ', State.paciente_seleccionado[0], font_weight="bold", font_size="12px"),
-                        # Nombre Paciente
-                        rx.text(
-                            State.paciente_seleccionado[1], font_weight="bold", font_size="12px",
-                            color=rx.cond(
-                                State.paciente_actual_disponible,
-                                PACIENTE_DISPONIBLE_ATENCION_COLOR,
-                                rx.cond(
-                                    State.paciente_actual_es_propio, "inherit", PACIENTE_AJENO_ATENCION_COLOR
+                    rx.vstack(
+                        # Línea 1: Historia Clínica + Nombre Paciente
+                        rx.hstack(
+                            rx.text('# ', State.paciente_seleccionado[0], font_weight="bold", font_size="12px"),
+                            rx.text(
+                                State.paciente_seleccionado[1], font_weight="bold", font_size="12px",
+                                color=rx.cond(
+                                    State.paciente_actual_disponible,
+                                    PACIENTE_DISPONIBLE_ATENCION_COLOR,
+                                    rx.cond(
+                                        State.paciente_actual_es_propio, "inherit", PACIENTE_AJENO_ATENCION_COLOR
+                                    ),
                                 ),
                             ),
+                            spacing="2",
                         ),
-                        # Edad
-                        rx.badge(State.paciente_seleccionado[2], variant="surface", font_size="12px"),
-                        # Fecha Nacimiento
-                        rx.badge(State.paciente_seleccionado[3], variant="surface", font_size="12px"),
-                        # Grupo sanguineo
-                        rx.badge(State.paciente_seleccionado[4], variant="solid", color_scheme="crimson", font_size="12px"),
-                        spacing="2",
-                        padding="2px",
+                        # Línea 2: Edad, Fecha Nacimiento, Grupo Sanguíneo — alineada a la derecha
+                        rx.hstack(
+                            rx.badge(State.paciente_seleccionado[2], variant="surface", font_size="12px"),
+                            rx.badge(State.paciente_seleccionado[3], variant="surface", font_size="12px"),
+                            rx.badge(State.paciente_seleccionado[4], variant="solid", color_scheme="crimson", font_size="12px"),
+                            spacing="2",
+                            align_self="end",
+                        ),
+                        spacing="1",
+                        align_items="start",
                     ),
                     position="absolute",
-                    top="10px",
+                    top="3px",
                     left="80px",
                     margin="2px",
-                    border="1px solid black",
+                    border="1px solid var(--gray-4)",
                     padding="4px",
-                    height="33px",
                     border_radius="3px",
                 ),
                 #Boton mostrar/ocultar panel de historial
@@ -119,117 +109,77 @@ def navbar():
                     title="Mostrar/Ocultar Panel de Historial",
                     cursor="pointer",
                     position="absolute",
-                    top="10px",
-                    left="590px",
+                    top="3px",
+                    left="350px",
                 ),
-                # Grupo central — contenedor posicionado al 50% del navbar
-                rx.box(
-                    rx.cond(
-                        State.puede_escribir_paciente_actual,
-                        rx.cond(
-                            AtencionState.atencion_iniciada,
-                            # ── Botones SOAP / Prescripción / Exámenes ────────────
-                            rx.hstack(
-                                rx.cond(
-                                    AtencionState.offcanvas_atencion_actual,
-                                    rx.button("📖 SOAP", color="white", font_size="12px",
-                                              on_click=AtencionState.cierra_offcanvas_actual, cursor="pointer",
-                                              bg=BOTON_ABIERTO, border=_B),
-                                    rx.button("📕 SOAP", font_size="12px",
-                                              variant='surface', border=_B,
-                                              on_click=AtencionState.abre_offcanvas_actual, cursor="pointer"),
-                                ),
-                                rx.cond(
-                                    AtencionState.offcanvas_prescripcion,
-                                    rx.button("📖 Prescripción", bg=BOTON_ABIERTO, color="white", font_size="12px",
-                                              border=_B, on_click=AtencionState.cierra_offcanvas_prescripcion, cursor="pointer"),
-                                    rx.button("📗 Prescripción", variant='surface', font_size="12px",
-                                              border=_B, on_click=AtencionState.abre_offcanvas_prescripcion, cursor="pointer"),
-                                ),
-                                rx.cond(
-                                    AtencionState.offcanvas_pedido_examenes,
-                                    rx.button("📖 Pedido Exámenes", bg=BOTON_ABIERTO, color="white", font_size="12px",
-                                              border=_B, on_click=AtencionState.cierra_offcanvas_pedido_examenes, cursor="pointer"),
-                                    rx.button("📘 Pedido Exámenes", variant='surface', font_size="12px",
-                                              border=_B, on_click=AtencionState.abre_offcanvas_pedido_examenes, cursor="pointer"),
-                                ),
-                                spacing="2",
-                                align="center",
-                                position="absolute",
-                                left="50%",
-                            ),
-                            # ── Botones "Nueva Atención" / "Editar Atención" ──────
-                            rx.hstack(
-                                rx.button(
-                                    "Nueva Atención",
-                                    on_click=AtencionState.iniciar_nueva_atencion,
-                                    type="button",
-                                    bg=BOTON_IMPRIMIR,
-                                    color="white",
-                                    font_size="13px",
-                                    font_weight="600",
-                                    cursor="pointer",
-                                ),
-                                rx.cond(
-                                    State.hay_atencion_hoy_historial,
-                                    rx.button(
-                                        "Editar Atención",
-                                        on_click=AtencionState.editar_atencion_historica,
-                                        type="button",
-                                        variant="surface",
-                                        color_scheme="plum",
-                                        font_size="13px",
-                                        font_weight="600",
-                                        cursor="pointer",
-                                    ),
-                                    rx.fragment(),
-                                ),
-                                spacing="2",
-                                align="center",
-                            ),
-                        ),
-                        rx.fragment(),
-                    ),
-                    position="absolute",
-                    left="58%",
-                    transform="translateX(-50%)",
-                    top="11px",
-                ),
-
                 rx.spacer(),
-                rx.vstack(
-                    # Resultados Imagen — Med.Lee + Med.Prop + Admin
-                    rx.cond(
-                        State.puede_ver_clinica,
-                        rx.cond(
-                            AtencionState.offcanvas_resultados_examenes,
-                            rx.button("📖 Imágenes", color_scheme="tomato", variant="solid",
-                                      font_size="9px", height="22px", padding="0 8px",
-                                      on_click=AtencionState.cierra_offcanvas_resultados_examenes, cursor="pointer"),
-                            rx.button("📙 Imágenes", color_scheme="tomato", variant="surface",
-                                      font_size="9px", height="22px", padding="0 8px", cursor="pointer",
-                                      on_click=[AtencionState.abre_offcanvas_resultados_examenes, ResultadosState.ri_recargar]),
+                # ── Menú "Nueva Atención" / "Editar Atención" — siempre visible ───
+                rx.cond(
+                    State.puede_escribir_paciente_actual,
+                    rx.menu.root(
+                        rx.menu.trigger(
+                            rx.button(
+                                rx.cond(
+                                    AtencionState.soap_id_atencion > 0,
+                                    "📝 Editar Atención",
+                                    "🆕 Nueva Atención",
+                                ),
+                                variant="surface", font_size="12px", border=_B,
+                                cursor="pointer", type="button", height="33px",
+                            ),
                         ),
-                        rx.fragment(),
-                    ),
-                    # Resultados Laboratorio — Med.Lee + Med.Prop + Admin
-                    rx.cond(
-                        State.puede_ver_clinica,
-                        rx.cond(
-                            AtencionState.offcanvas_lab_orl,
-                            rx.button("📖 Análisis Valores", color_scheme="tomato", variant="solid",
-                                      font_size="9px", height="22px", padding="0 8px",
-                                      on_click=AtencionState.cerrar_lab_orl, cursor="pointer"),
-                            rx.button("🧪 Análisis Valores", color_scheme="tomato", variant="surface",
-                                      font_size="9px", height="22px", padding="0 8px", cursor="pointer",
-                                      on_click=LaboratorioState.abrir_lab_orl),
+                        rx.menu.content(
+                            rx.cond(
+                                AtencionState.offcanvas_atencion_actual,
+                                rx.menu.item("📖 SOAP", on_click=AtencionState.cierra_offcanvas_actual),
+                                rx.menu.item("📕 SOAP", on_click=[AtencionState.iniciar_nueva_atencion, AtencionState.abre_offcanvas_actual]),
+                            ),
+                            rx.cond(
+                                AtencionState.offcanvas_prescripcion,
+                                rx.menu.item("📖 Prescripción", on_click=AtencionState.cierra_offcanvas_prescripcion),
+                                rx.menu.item("📗 Prescripción", on_click=[AtencionState.iniciar_nueva_atencion, AtencionState.abre_offcanvas_prescripcion]),
+                            ),
+                            rx.cond(
+                                AtencionState.offcanvas_pedido_examenes,
+                                rx.menu.item("📖 Pedido Exámenes", on_click=AtencionState.cierra_offcanvas_pedido_examenes),
+                                rx.menu.item("📘 Pedido Exámenes", on_click=[AtencionState.iniciar_nueva_atencion, AtencionState.abre_offcanvas_pedido_examenes]),
+                            ),
                         ),
-                        rx.fragment(),
                     ),
-                    spacing="1",
-                    align="end",
+                    rx.fragment(),
                 ),
-                rx.button("Salir", on_click=AtencionState.logout_con_advertencia),
+                rx.menu.root(
+                    rx.menu.trigger(
+                        rx.button("☰", cursor="pointer", variant="surface", font_size="14px",
+                                  type="button", height="33px"),
+                    ),
+                    rx.menu.content(
+                        rx.cond(
+                            State.puede_ver_clinica,
+                            rx.fragment(
+                                # Resultados Imagen — Med.Lee + Med.Prop + Admin
+                                rx.cond(
+                                    AtencionState.offcanvas_resultados_examenes,
+                                    rx.menu.item("📖 Imágenes",
+                                                 on_click=AtencionState.cierra_offcanvas_resultados_examenes),
+                                    rx.menu.item("📙 Imágenes",
+                                                 on_click=[AtencionState.abre_offcanvas_resultados_examenes, ResultadosState.ri_recargar]),
+                                ),
+                                # Resultados Laboratorio — Med.Lee + Med.Prop + Admin
+                                rx.cond(
+                                    AtencionState.offcanvas_lab_orl,
+                                    rx.menu.item("📖 Análisis Valores",
+                                                 on_click=AtencionState.cerrar_lab_orl),
+                                    rx.menu.item("🧪 Análisis Valores",
+                                                 on_click=LaboratorioState.abrir_lab_orl),
+                                ),
+                            ),
+                            rx.fragment(),
+                        ),
+                        rx.menu.separator(),
+                        rx.menu.item("Salir", on_click=AtencionState.logout_con_advertencia),
+                    ),
+                ),
                 spacing="4",
                 top="11px",
                 align_items="center",
@@ -303,6 +253,9 @@ def panel_derecha():
                 panel_historia_atencion(),
                 width="100%",
                 height="100%",
+                background_color="white",
+                position="relative",
+                z_index="1",
                 style={
                     "transform": rx.cond(State.show_panel_izq, "translateX(0)", "translateX(100%)"),
                     "transition": "transform 0.3s ease-in-out",
@@ -320,83 +273,21 @@ def panel_derecha():
                         padding="8px 12px",
                         overflow_y="auto",
                     ),
-                    rx.center(
-                        rx.image(
-                            src="/logotipo_original.png",
-                            height="192px",
-                            object_fit="contain",
-                        ),
-                        width="100%",
-                        height="100%",
-                    ),
+                    rx.fragment(),
                 ),
             ),
         ),
         flex="1",
         height="100%",
-        background_color="white",
+        background_color="transparent",
         border_left="1px solid var(--gray-5)",
         overflow="hidden",
+        position="relative",
     )
-                
+
 def panel_izquierda():
     return rx.box(
-                
                 rx.box(     #Box que contiene los tabs de atencion, historial, prescripción, etc.
-                    #. #rx.tabs.root(
-                    #. #    rx.tabs.list(
-                    #. #        rx.tabs.trigger("Historial Atenciones",value="historial_atenciones",
-                    #. #            style={
-                    #. #                "white-space": "pre-wrap",
-                    #. #                "height": "auto",
-                    #. #                "min-height": "48px",
-                    #. #                "line-height": "1.2",
-                    #. #                "padding": "4px 8px",
-                    #. #                "text-align": "center",
-                    #. #            },on_click=lambda: State.cambia_tab("historial_atenciones"),),
-                            # #rx.tabs.trigger("Prescripciones", value="prescripcion_cuidados",
-                            # #    style={
-                            # #    "white-space": "pre-wrap",
-                            # #    "height": "auto",
-                            # #    "min-height": "48px",
-                            # #    "line-height": "1.2",
-                            # #    "padding": "4px 8px",
-                            # #    "text-align": "center",
-                            # #},on_click=lambda: State.cambia_tab("historial_prescripciones"),),
-                            #rx.tabs.trigger("Resultados Laboratorio",value="resultados_examenes",
-                            #    style={
-                            #        "white-space": "pre-wrap",
-                            #        "height": "auto",
-                            #        "min-height": "48px",
-                            #        "line-height": "1.2",
-                            #        "padding": "4px 8px",
-                            #        "text-align": "center",
-                            #    },
-                            #    on_click=[State.cambia_tab("resultados_examenes"), LaboratorioState.lab_h_cargar],
-                            #),
-                #.#        ),
-                        #Contenido Atencion Actual
-                        # #rx.tabs.content(
-                        # #    rx.box(
-                        # #        rx.text('Consulta actual'),
-                        # #        width='49%',
-                        # #        height="25vh",
-                        # #        position='fixed',
-                        # #        left='1px',
-                        # #        top='150px',
-                        # #        margin_left="2px",
-                        # #        margin_top='2px',
-                        # #        padding='5px',
-                        # #        background_color="transparent",
-                        # #        border="solid 1px",
-                        # #    ),
-                        # #    value='consulta_actual',
-
-                        # #),
-
-                        #Contenido Historial Consultas
-                #.#        rx.tabs.content(
-                            #State.contenido_derecha == "Historial de Consultas",
                     rx.vstack(
                         rx.hstack(
                         rx.text("Historial de Atenciones"),
@@ -441,6 +332,16 @@ def panel_izquierda():
                             width="28px",
                             padding="0",
                             title="Limpiar búsqueda",
+                        ),
+                        # Botón Nueva Atención — sale del modo edición
+                        rx.button(
+                            "🆕 Nueva Atención",
+                            on_click=AtencionState.nueva_atencion_desde_historial,
+                            variant="surface",
+                            font_size="11px",
+                            cursor="pointer",
+                            type="button",
+                            size="1",
                         ),
                         padding='2px',
                         position="relative",
@@ -489,7 +390,7 @@ def panel_izquierda():
                     #),
                     flex="0 0 47%",
                     padding="5px",
-                    background_color="transparent",
+                    background_color="white",
                     border="solid 1px gray",
                     overflow="hidden",
                 ),
@@ -619,7 +520,7 @@ def panel_izquierda():
                     ),
                     flex="1",
                     padding="5px",
-                    background_color="transparent",
+                    background_color="white",
                     border="solid 1px gray",
                     overflow="hidden",
                     margin_top="2px",
@@ -646,6 +547,25 @@ def index():
     return rx.cond(State.is_authenticated,
             rx.box(
                 navbar(),
+                # Logotipo de fondo — capa más profunda de toda la página.
+                # Solo se ve cuando ningún panel/offcanvas lo cubre, ya que
+                # todos ellos se pintan encima (orden del DOM) con su propio
+                # fondo opaco.
+                rx.center(
+                    rx.image(
+                        src="/logotipo_original.png",
+                        width="40%",
+                        height="auto",
+                        object_fit="contain",
+                    ),
+                    position="fixed",
+                    top="60px",
+                    bottom="24px",
+                    left="0",
+                    right="0",
+                    z_index="0",
+                    pointer_events="none",
+                ),
                 # ── Área principal: columna izquierda + columna derecha ────────
                 rx.box(
                     panel_izquierda(),
@@ -694,6 +614,7 @@ def index():
                 dialogo_atenciones_tardias(),
                 offcanvas_certificados(),
                 offcanvas_menu(),
+                dialogo_solicitar_interconsulta(),
                 offcanvas_laboratorio(),
                 rx.toast.provider(),
                 overflow="hidden",

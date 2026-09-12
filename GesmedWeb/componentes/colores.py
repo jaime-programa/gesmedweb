@@ -63,3 +63,8 @@ PACIENTE_AJENO_ATENCION_COLOR = "#9CA3AF"  # tono tenue: nombre del paciente en 
 # médico debe poder verlo/atenderlo aunque su perfil sea "solo propios".
 PACIENTE_DISPONIBLE_LISTA_COLOR    = "#E67E22"  # naranja: fuente en la tabla de lista_pacientes
 PACIENTE_DISPONIBLE_ATENCION_COLOR = "#E67E22"  # naranja: nombre del paciente en el navbar de atención
+
+# ── Interconsulta ─────────────────────────────────────────────────────────────
+# Marca visual en tabla_historial_atenciones para atenciones generadas por un
+# médico auxiliar en el marco de una interconsulta (ver tabla `interconsulta`).
+INTERCONSULTA_COLOR = "#964E18"  # marrón

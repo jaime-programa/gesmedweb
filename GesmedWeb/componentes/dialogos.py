@@ -113,6 +113,12 @@ def dialogo_otros_sv():
 def form_atencion_actual():
     return rx.form(
             rx.hstack(
+                    rx.button(
+                        rx.icon("panel-left-open", size=14),
+                        on_click=AtencionState.cierra_offcanvas_actual,
+                        variant="ghost", cursor="pointer", type="button",
+                        title="Ocultar panel",
+                    ),
                     rx.text("📕 SOAP", font_weight="bold", font_size="1.4em"),
                     rx.spacer(),
                     # Botón Vincular Diagnóstico — visible solo cuando el SOAP está grabado
@@ -209,7 +215,27 @@ def form_atencion_actual():
                 ),
                 rx.box(),
             ),
-            rx.divider(),                                 
+            # Aviso cuando actualizar_atencion rechaza la edición (autor/mismo día)
+            rx.cond(
+                AtencionState.soap_error != "",
+                rx.hstack(
+                    rx.icon("triangle_alert", size=13, color="var(--red-9)"),
+                    rx.text(
+                        AtencionState.soap_error,
+                        font_size="11px",
+                        color="var(--red-9)",
+                    ),
+                    padding="6px 10px",
+                    background="var(--red-2)",
+                    border="1px solid var(--red-6)",
+                    border_radius="6px",
+                    width="100%",
+                    align="center",
+                    spacing="2",
+                ),
+                rx.box(),
+            ),
+            rx.divider(),
             rx.scroll_area(     #Antes scroll_area
                 rx.text("Motivo de Consulta (*)", font_weight="500"),
                 rx.text_area(value=AtencionState.soap_motivo,placeholder="Motivo de Consulta",height="80px",disabled=AtencionState.soap_campos_bloqueados,on_change=AtencionState.set_soap_motivo),
@@ -626,6 +652,12 @@ def form_prescripcion_actual() -> rx.Component:
     return rx.vstack(
         # ── Encabezado ─────────────────────────────────────────────────────────
         rx.hstack(
+            rx.button(
+                rx.icon("panel-left-open", size=14),
+                on_click=AtencionState.cierra_offcanvas_prescripcion,
+                variant="ghost", cursor="pointer", type="button",
+                title="Ocultar panel",
+            ),
             rx.text("📗 Prescripción", font_weight="bold", font_size="1.4em"),
             rx.spacer(),
             rx.cond(
@@ -1820,11 +1852,23 @@ def offcanvas_menu() -> rx.Component:
                     ),
                     collapsible=True, variant="ghost", width="100%",
                 ),
+                # Solicitar Interconsulta — Med.Prop + Admin, requiere paciente
+                rx.cond(
+                    State.puede_escribir_paciente_actual,
+                    rx.button(
+                        rx.icon("users-round", size=13),
+                        rx.text("Solicitar Interconsulta", font_size="11px"),
+                        variant="ghost", width="100%", justify="start",
+                        type="button",
+                        on_click=AtencionState.ic_abrir,
+                    ),
+                    rx.fragment(),
+                ),
                 spacing="2",
                 align="start",
                 padding="12px",
                 width="100%",
-                
+
             ),
             position="fixed",
             top="60px",
@@ -1841,6 +1885,77 @@ def offcanvas_menu() -> rx.Component:
             ),
             transition="transform 0.3s ease-in-out",
         ),
+    )
+
+
+# ── Diálogo Solicitar Interconsulta ──────────────────────────────────────────
+
+def dialogo_solicitar_interconsulta() -> rx.Component:
+    return rx.dialog.root(
+        rx.dialog.content(
+            rx.dialog.title(
+                rx.hstack(
+                    rx.icon("users-round", size=16),
+                    rx.text("Solicitar Interconsulta"),
+                    spacing="2", align="center",
+                ),
+            ),
+            rx.vstack(
+                rx.cond(
+                    AtencionState.ic_error != "",
+                    rx.hstack(
+                        rx.icon("triangle_alert", size=13, color="var(--red-9)"),
+                        rx.text(AtencionState.ic_error, font_size="11px", color="var(--red-9)"),
+                        padding="6px 10px", background="var(--red-2)",
+                        border="1px solid var(--red-6)", border_radius="6px",
+                        width="100%", align="center", spacing="2",
+                    ),
+                    rx.fragment(),
+                ),
+                rx.vstack(
+                    rx.text("Médico Auxiliar (*)", font_size="12px", font_weight="500"),
+                    rx.select(
+                        AtencionState.ic_auxiliar_opciones,
+                        value=AtencionState.ic_auxiliar_sel,
+                        on_change=AtencionState.set_ic_auxiliar_sel,
+                        placeholder="Seleccione un médico",
+                        size="2", width="100%",
+                    ),
+                    spacing="1", width="100%",
+                ),
+                rx.vstack(
+                    rx.text("Motivo de la Interconsulta (*)", font_size="12px", font_weight="500"),
+                    rx.text_area(
+                        value=AtencionState.ic_motivo,
+                        on_change=AtencionState.set_ic_motivo,
+                        placeholder="Motivo",
+                        height="80px", width="100%",
+                    ),
+                    spacing="1", width="100%",
+                ),
+                rx.vstack(
+                    rx.text("Fecha Tentativa de Finalización (*)", font_size="12px", font_weight="500"),
+                    rx.input(
+                        type="date",
+                        value=AtencionState.ic_fecha_expiracion,
+                        on_change=AtencionState.set_ic_fecha_expiracion,
+                        size="2", width="100%",
+                    ),
+                    spacing="1", width="100%",
+                ),
+                rx.hstack(
+                    rx.button("Cancelar", variant="soft", color_scheme="gray",
+                              size="2", type="button", on_click=AtencionState.ic_cerrar),
+                    rx.button("Solicitar", size="2", type="button",
+                              on_click=AtencionState.ic_solicitar),
+                    justify="end", width="100%",
+                ),
+                spacing="3", width="100%", padding_top="8px",
+            ),
+            style={"max_width": "420px"},
+        ),
+        open=AtencionState.ic_dialog_open,
+        on_open_change=AtencionState.set_ic_dialog_open,
     )
 
 
@@ -2771,6 +2886,12 @@ def offcanvas_pedido_examenes():
 
                 # ── Cabecera ──────────────────────────────────────────────────
                 rx.hstack(
+                    rx.button(
+                        rx.icon("panel-left-open", size=14),
+                        on_click=AtencionState.cierra_offcanvas_pedido_examenes,
+                        variant="ghost", cursor="pointer", type="button",
+                        title="Ocultar panel",
+                    ),
                     rx.text(
                         "🔬 Pedido de Exámenes",
                         font_weight="bold",
@@ -3121,6 +3242,15 @@ def offcanvas_resultados_examenes():
             rx.vstack(
                 # ── Cabecera ─────────────────────────────────────────────────
                 rx.hstack(
+                    rx.button(
+                        rx.icon("panel-left-open", size=14),
+                        on_click=AtencionState.cierra_offcanvas_resultados_examenes,
+                        variant="ghost",
+                        cursor="pointer",
+                        font_size="14px",
+                        type="button",
+                        title="Ocultar panel",
+                    ),
                     rx.text(
                         "🔬 Imágenes",
                         font_weight="bold",
@@ -3452,25 +3582,43 @@ def offcanvas_config() -> rx.Component:
                         rx.link(
                             rx.button(
                                 rx.icon("file_spreadsheet", size=14),
-                                rx.text("Formatos Impresos", font_size="12px"),
+                                rx.text("Editar Formatos Impresos", font_size="12px"),
                                 variant="ghost", width="100%", justify="start",
                                 type="button",
+                                height="30px",
                                 on_click=State.toggle_offcanvas_config,
                             ),
                             href="/config/reportes",
                             width="100%",
+                            height="50px",
+                            text_decoration="none",
+                        ),
+                        rx.link(
+                            rx.button(
+                                rx.icon("flask-conical", size=14),
+                                rx.text("Mantenimiento de Exámenes", font_size="12px"),
+                                variant="ghost", width="100%", justify="start",
+                                type="button",
+                                height="30px",
+                                on_click=State.toggle_offcanvas_config,
+                            ),
+                            href="/config/examenes",
+                            width="100%",
+                            height="50px",
                             text_decoration="none",
                         ),
                         rx.link(
                             rx.button(
                                 rx.icon("users", size=14),
-                                rx.text("Usuarios", font_size="12px"),
+                                rx.text("Mantenimiento de Usuarios", font_size="12px"),
                                 variant="ghost", width="100%", justify="start",
                                 type="button",
+                                height="30px",
                                 on_click=State.toggle_offcanvas_config,
                             ),
                             href="/config/usuarios",
                             width="100%",
+                            height="50px",
                             text_decoration="none",
                         ),
                         spacing="0", width="100%",
@@ -4412,6 +4560,16 @@ def offcanvas_resultados_laboratorio() -> rx.Component:
             rx.vstack(
                 # ── Cabecera ─────────────────────────────────────────────────
                 rx.hstack(
+                    rx.button(
+                        rx.icon("panel-left-open", size=14),
+                        #"▶️",
+                        on_click=AtencionState.cerrar_lab_orl,
+                        variant="ghost",
+                        cursor="pointer",
+                        font_size="14px",
+                        type="button",
+                        title="Ocultar panel",
+                    ),
                     rx.icon("flask-conical", size=16, color="var(--orange-10)"),
                     rx.text(
                         "Análisis de Valores",

@@ -9,7 +9,7 @@ from sqlalchemy import text
 # URL base del backend (http://localhost:8000 en dev; se configura en rxconfig.py para producción)
 _BACKEND = _rx_get_config().api_url.rstrip("/")
 from typing import Tuple
-from datetime import date,datetime
+from datetime import date,datetime,timedelta
 from .modelos.mis_modelos import (
     Paciente, Atencion, Points, Diagnostico, Cie10, Rel_atencion_diagnostico,
     ReporteImpreso, ReporteImagen, ReporteSeccion, ReporteCelda, AntecedenteFamiliar, Alergia,
@@ -62,6 +62,13 @@ from .querys.querys import (
     listar_ant_familiares,
     listar_tipos_medicamento, buscar_similares_medicamento, guardar_medicamento_catalogo,
     listar_usuarios, crear_usuario, actualizar_usuario, resetear_clave,
+    listar_examen_tipos, crear_examen_tipo, actualizar_examen_tipo, eliminar_examen_tipo,
+    listar_examen_catalogo, crear_examen_catalogo, actualizar_examen_catalogo,
+    eliminar_examen_catalogo,
+    es_atencion_bajo_interconsulta, registrar_interconsulta,
+    crear_solicitud_interconsulta, listar_solicitudes_interconsulta,
+    finalizar_solicitud_interconsulta, cerrar_interconsulta,
+    listar_medicos_para_interconsulta,
 )
 from .crypto import GesmedCrypto
 
@@ -100,6 +107,7 @@ class State(rx.State):
     paciente_seleccionado: list = []
     paciente_actual_es_propio: bool = True
     paciente_actual_disponible: bool = False
+    paciente_actual_interconsulta: bool = False  # acceso temporal vía solicitud_interconsulta vigente
     diagnostico_seleccionado: list = []
     atencion_seleccionada: list = []
     celda_pacientes: dict = {"row": None, "column": None}
@@ -153,7 +161,7 @@ class State(rx.State):
     def cambia_tab(self, tab: str):
         self.contenido_derecha = tab
         if tab == "historial_atenciones" and self.id_atencion_seleccionada == 0 and self.lista_atenciones:
-            self.selecciona_atencion(self.lista_atenciones[0]['id_atencion'])
+            yield from self.selecciona_atencion(self.lista_atenciones[0]['id_atencion'])
         if tab == "historial_prescripciones":
             yield PrescripcionState.hp_cargar
 
@@ -286,8 +294,10 @@ class State(rx.State):
         (permisos[2] == 'P', perfil 3 'T/P'). En perfil 1 (T/T) los botones
         quedan habilitados aunque el paciente sea ajeno, porque ese perfil
         puede modificar cualquier paciente. En perfil 2 (P/P) no aplica en
-        la práctica, ya que ese perfil ni siquiera ve pacientes ajenos."""
-        return self.edita_solo_propios_pacientes and self.paciente_actual_ajeno
+        la práctica, ya que ese perfil ni siquiera ve pacientes ajenos. Tampoco
+        aplica si el acceso es por una interconsulta vigente (el auxiliar sí
+        puede escribir)."""
+        return self.edita_solo_propios_pacientes and self.paciente_actual_ajeno and not self.paciente_actual_interconsulta
 
     # ── Control de perfiles ───────────────────────────────────────────────────
     # Perfiles: SECRETARIA | MEDICO_CONSULTA | MEDICO_ATENCION | ADMIN
@@ -323,9 +333,12 @@ class State(rx.State):
         """puede_escribir (rol) + respeta el alcance de escritura (permisos[2])
         sobre el paciente actualmente cargado. paciente_actual_es_propio se
         calcula una sola vez, al seleccionar el paciente (no en cada acceso),
-        para no repetir la consulta a Atencion en cada render."""
+        para no repetir la consulta a Atencion en cada render. Una interconsulta
+        vigente también habilita la escritura aunque el paciente no sea propio."""
         return self.puede_escribir and (
-            not self.edita_solo_propios_pacientes or self.paciente_actual_es_propio
+            not self.edita_solo_propios_pacientes
+            or self.paciente_actual_es_propio
+            or self.paciente_actual_interconsulta
         )
 
     @rx.var
@@ -415,13 +428,6 @@ class State(rx.State):
     def hay_pedido_laboratorio_hist(self) -> bool:
         return len(self.ha_pedido_examenes) > 0
 
-    @rx.var
-    def hay_atencion_hoy_historial(self) -> bool:
-        if not self.atencion_seleccionada or len(self.atencion_seleccionada) < 2:
-            return False
-        fecha_str = str(self.atencion_seleccionada[1]).split("|")[0].strip()
-        return fecha_str == date.today().isoformat()
-
     def set_que_paciente_busco(self,filtro:str):
         self.que_paciente_busco=filtro
         if callable(self.carga_pacientes_filtrados):
@@ -503,11 +509,15 @@ class State(rx.State):
         nro_hclinica = datos[0]
         with Session(get_engine()) as session:
             accesible, disponible = estado_propiedad_paciente(session, nro_hclinica, self.id_medico)
-        if self.ve_solo_propios_pacientes and not accesible:
+            interconsulta = False
+            if not accesible:
+                interconsulta = es_atencion_bajo_interconsulta(session, nro_hclinica, self.id_medico)
+        if self.ve_solo_propios_pacientes and not accesible and not interconsulta:
             return False
         self.paciente_seleccionado = datos
         self.paciente_actual_es_propio = accesible
         self.paciente_actual_disponible = disponible
+        self.paciente_actual_interconsulta = interconsulta
         self.contenido_derecha = ""
         return True
 
@@ -537,7 +547,7 @@ class State(rx.State):
 
     def carga_atenciones(self):
         with Session(get_engine()) as session:
-            self.lista_atenciones=historial_atenciones_con_cie10(session,self.paciente_seleccionado[0],'')
+            self.lista_atenciones=historial_atenciones_con_cie10(session,self.paciente_seleccionado[0],'',self.id_medico)
             self.lista_diagnosticos=historial_diagnosticos(session,self.paciente_seleccionado[0],self.id_medico)
             self.lista_ant_familiares=listar_ant_familiares(session,self.paciente_seleccionado[0],self.id_medico)
             self.lista_alergias=listar_alergias_paciente(session,self.paciente_seleccionado[0])
@@ -575,7 +585,7 @@ class State(rx.State):
 
     def actualiza_atenciones_filtradas(self):
         with Session(get_engine()) as session:
-            self.lista_atenciones=historial_atenciones_con_cie10(session,self.paciente_seleccionado[0],self.que_historial_busco)
+            self.lista_atenciones=historial_atenciones_con_cie10(session,self.paciente_seleccionado[0],self.que_historial_busco,self.id_medico)
         #self.lista_atenciones=historial_atenciones(self.paciente_seleccionado[0],self.que_historial_busco)
         
         
@@ -919,6 +929,9 @@ class State(rx.State):
                 self.contenido_derecha = 'historial_atenciones'
                 break
         self.id_atencion_seleccionada = id_atencion
+        # Cualquier selección en el historial saca del modo edición: el
+        # menú "Editar Atención" solo se activa vía el ícono "lápiz".
+        yield AtencionState.sale_modo_edicion_si_corresponde
         self.ha_tab_historia = "soap"
         self.ha_panel_expandido = False
         with Session(get_engine()) as session:
@@ -966,19 +979,113 @@ class AtencionState(State):
     def toggle_offcanvas_menu(self):
         self.offcanvas_menu = not self.offcanvas_menu
 
+    # ── Solicitar Interconsulta ──────────────────────────────────────────────
+    ic_dialog_open: bool = False
+    ic_motivo: str = ""
+    ic_fecha_expiracion: str = ""
+    ic_auxiliar_opciones: list[str] = []
+    ic_auxiliar_sel: str = ""
+    ic_error: str = ""
+    ic_ok: bool = False
+
+    def ic_abrir(self):
+        if not self.puede_escribir_paciente_actual:
+            return
+        if not self.paciente_seleccionado:
+            return
+        self.ic_motivo = ""
+        self.ic_auxiliar_sel = ""
+        self.ic_error = ""
+        self.ic_ok = False
+        self.ic_fecha_expiracion = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
+        with Session(get_engine()) as session:
+            medicos = listar_medicos_para_interconsulta(session, self.id_medico)
+        self.ic_auxiliar_opciones = [f"{m['id_medico']} - {m['nombre_medico']}" for m in medicos]
+        self.ic_dialog_open = True
+        self.offcanvas_menu = False
+
+    def ic_cerrar(self):
+        self.ic_dialog_open = False
+
+    def set_ic_dialog_open(self, v: bool):
+        self.ic_dialog_open = v
+
+    def set_ic_motivo(self, v: str):
+        self.ic_motivo = v
+
+    def set_ic_fecha_expiracion(self, v: str):
+        self.ic_fecha_expiracion = v
+
+    def set_ic_auxiliar_sel(self, v: str):
+        self.ic_auxiliar_sel = v
+
+    def ic_solicitar(self):
+        if not self.puede_escribir_paciente_actual:
+            return
+        if not self.paciente_seleccionado:
+            return
+        if not self.ic_motivo.strip():
+            self.ic_error = "El motivo es obligatorio."
+            return
+        if not self.ic_auxiliar_sel:
+            self.ic_error = "Seleccione el médico auxiliar."
+            return
+        try:
+            fecha_exp = datetime.strptime(self.ic_fecha_expiracion, "%Y-%m-%d").date()
+        except ValueError:
+            self.ic_error = "Fecha de finalización inválida."
+            return
+        id_auxiliar = int(self.ic_auxiliar_sel.split(" - ")[0])
+        nro = self.paciente_seleccionado[0]
+        with Session(get_engine()) as session:
+            crear_solicitud_interconsulta(
+                session, nro, self.id_medico, id_auxiliar,
+                self.ic_motivo.strip(), fecha_exp,
+            )
+        self.ic_error = ""
+        self.ic_ok = True
+        self.ic_dialog_open = False
+
     def iniciar_nueva_atencion(self):
         if not self.puede_escribir_paciente_actual:
             return
         self.atencion_iniciada = True
+        self.show_panel_izq = False
 
     def reset_atencion_iniciada(self):
         self.atencion_iniciada = False
+
+    def sale_modo_edicion_si_corresponde(self):
+        """Si veníamos editando una atención (soap_id_atencion>0), vuelve a
+        modo 'Nueva Atención' descartando lo cargado en modo edición."""
+        if self.soap_id_atencion:
+            self.reinicia_soap()
+
+    def nueva_atencion_desde_historial(self):
+        """Botón 'Nueva Atención' sobre tabla_historial_atenciones: fuerza
+        la salida del modo edición, quita el resaltado de fila, oculta el
+        historial y abre el offcanvas SOAP en modo 'nueva atención'."""
+        if not self.puede_escribir_paciente_actual:
+            return
+        self.sale_modo_edicion_si_corresponde()
+        self.id_atencion_seleccionada = 0
+        self.atencion_iniciada = True
+        self.show_panel_izq = False
+        self.offcanvas_atencion_actual = True
+        self.offcanvas_prescripcion = False
+        self.offcanvas_pedido_examenes = False
+        self.offcanvas_resultados_examenes = False
 
     def editar_atencion_historica(self):
         if not self.puede_escribir_paciente_actual:
             return
         if not self.atencion_seleccionada or len(self.atencion_seleccionada) < 8:
             return
+        if self.atencion_seleccionada[0] != self.id_medico:
+            return  # solo el autor de la atención puede editarla
+        fecha_str = str(self.atencion_seleccionada[1]).split("|")[0].strip()
+        if fecha_str != date.today().isoformat():
+            return  # solo se puede editar una atención el mismo día
         self.soap_id_atencion = self.id_atencion_seleccionada
         self.soap_motivo    = str(self.atencion_seleccionada[2])
         self.soap_revision  = str(self.atencion_seleccionada[3])
@@ -1152,6 +1259,7 @@ class AtencionState(State):
 
     # id de la atención recién grabada (disponible tras submit_soap)
     soap_id_atencion: int = 0
+    soap_error: str = ""  # mensaje cuando actualizar_atencion rechaza la edición (autor/fecha)
 
     # Vincular Diagnóstico
     vd_dialog_open: bool = False
@@ -1283,6 +1391,8 @@ class AtencionState(State):
                 session.add(nueva_atencion)
                 session.flush()
                 self.soap_id_atencion = nueva_atencion.id_atencion
+                if es_atencion_bajo_interconsulta(session, nro, self.id_medico):
+                    registrar_interconsulta(session, self.soap_id_atencion, self.id_medico)
                 guardar_sv_atencion(session, self.soap_id_atencion, self.sv_catalogo)
                 for id_diag in self.vd_seleccionados:
                     nodup = f"{str(self.soap_id_atencion).zfill(8)}.{str(id_diag).zfill(8)}"
@@ -1306,7 +1416,7 @@ class AtencionState(State):
             self.soap_vincular_msg  = False
             self.lista_diagnosticos_vinculados = list(self.vd_seleccionados)
             with Session(get_engine()) as session:
-                self.lista_atenciones = historial_atenciones_con_cie10(session, nro, "")
+                self.lista_atenciones = historial_atenciones_con_cie10(session, nro, "", self.id_medico)
             self.que_historial_busco = ""
         else:
             # ── SOAP ya existe: DELETE + INSERT (re-vincular) ─────────────────
@@ -1340,7 +1450,7 @@ class AtencionState(State):
         if self.paciente_seleccionado:
             with Session(get_engine()) as session:
                 self.lista_atenciones = historial_atenciones_con_cie10(
-                    session, self.paciente_seleccionado[0], ""
+                    session, self.paciente_seleccionado[0], "", self.id_medico
                 )
             self.que_historial_busco = ""
         # No cerrar el offcanvas: el médico continúa con la atención
@@ -1399,6 +1509,7 @@ class AtencionState(State):
         self.offcanvas_atencion_actual = False
         self.offcanvas_prescripcion = False
         self.offcanvas_lab_orl = False
+        self.show_panel_izq = False
 
     def cierra_offcanvas_resultados_examenes(self):
         self.offcanvas_resultados_examenes = False
@@ -1472,23 +1583,30 @@ class AtencionState(State):
 
     def activar_edicion_soap(self):
         self.soap_modo_edicion = True
+        self.soap_error = ""
 
     def guardar_cambios_soap(self):
         if not self.puede_escribir_paciente_actual:
             return
         if not self.soap_id_atencion:
             return
+        self.soap_error = ""
         with Session(get_engine()) as session:
-            actualizar_atencion(
-                session,
-                self.soap_id_atencion,
-                self.soap_motivo,
-                self.soap_revision,
-                self.soap_subjetivo,
-                self.soap_objetivo,
-                self.soap_analisis,
-                self.soap_plan,
-            )
+            try:
+                actualizar_atencion(
+                    session,
+                    self.soap_id_atencion,
+                    self.soap_motivo,
+                    self.soap_revision,
+                    self.soap_subjetivo,
+                    self.soap_objetivo,
+                    self.soap_analisis,
+                    self.soap_plan,
+                    self.id_medico,
+                )
+            except ValueError as e:
+                self.soap_error = str(e)
+                return
             guardar_sv_atencion(session, self.soap_id_atencion, self.sv_catalogo)
         self.soap_modo_edicion = False
         # Actualiza snapshot con los nuevos valores guardados
@@ -1501,7 +1619,7 @@ class AtencionState(State):
         if self.paciente_seleccionado:
             nro = self.paciente_seleccionado[0]
             with Session(get_engine()) as session:
-                self.lista_atenciones = historial_atenciones_con_cie10(session, nro, "")
+                self.lista_atenciones = historial_atenciones_con_cie10(session, nro, "", self.id_medico)
             self.que_historial_busco = ""
 
     def set_soap_dialogo_salir(self, v: bool):
@@ -5826,6 +5944,7 @@ class LaboratorioState(AtencionState):
     def abrir_lab_orl(self):
         self.offcanvas_lab_orl = True
         self.offcanvas_resultados_examenes = False
+        self.show_panel_izq = False
         nro = self.nro_hclinica_seleccionado
         if nro > 0:
             with Session(get_engine()) as session:
@@ -6383,3 +6502,187 @@ class AdminUsuariosState(State):
         # Recarga forzada de esta sesión: evita que quede información en
         # memoria (State ya instanciado) proveniente de la base anterior.
         yield rx.call_script("window.location.replace('/')")
+
+
+class ExamenesState(State):
+    """Mantenimiento (CRUD) de examen_tipo y examen_catalogo — solo ADMIN."""
+
+    # Listados
+    ex_tipos: list[dict] = []
+    ex_catalogo: list[dict] = []
+
+    # Tipo seleccionado a la izquierda (0 = ninguno)
+    ex_tipo_sel: int = 0
+    ex_tipo_sel_nombre: str = ""
+
+    # Formulario: tipo (nuevo/editar)
+    ex_t_id: int = 0
+    ex_t_nombre: str = ""
+    ex_dlg_tipo: bool = False
+
+    # Formulario: catálogo (nuevo/editar)
+    ex_c_id: int = 0
+    ex_c_alias: str = ""
+    ex_c_nombre: str = ""
+    ex_dlg_catalogo: bool = False
+
+    # Feedback
+    ex_error: str = ""
+    ex_ok: str = ""
+
+    def set_ex_t_nombre(self, v: str): self.ex_t_nombre = v
+    def set_ex_c_alias(self, v: str):  self.ex_c_alias  = v
+    def set_ex_c_nombre(self, v: str): self.ex_c_nombre = v
+    def set_ex_dlg_tipo(self, v: bool):      self.ex_dlg_tipo = v
+    def set_ex_dlg_catalogo(self, v: bool):  self.ex_dlg_catalogo = v
+
+    def ex_cargar(self):
+        if not self.puede_admin:
+            return
+        with Session(get_engine()) as s:
+            self.ex_tipos = listar_examen_tipos(s)
+        if self.ex_tipos and not any(t["id_examen_tipo"] == self.ex_tipo_sel for t in self.ex_tipos):
+            self.ex_tipo_sel = 0
+        if self.ex_tipo_sel:
+            self._ex_cargar_catalogo()
+        else:
+            self.ex_catalogo = []
+            self.ex_tipo_sel_nombre = ""
+
+    def _ex_cargar_catalogo(self):
+        with Session(get_engine()) as s:
+            self.ex_catalogo = listar_examen_catalogo(s, self.ex_tipo_sel)
+
+    def ex_seleccionar_tipo(self, id_examen_tipo: int):
+        if not self.puede_admin:
+            return
+        self.ex_tipo_sel = id_examen_tipo
+        t = next((x for x in self.ex_tipos if x["id_examen_tipo"] == id_examen_tipo), None)
+        self.ex_tipo_sel_nombre = t["examen_tipo"] if t else ""
+        self._ex_cargar_catalogo()
+
+    # ── Tipo: nuevo / editar ──────────────────────────────────────────────────
+
+    def ex_abrir_nuevo_tipo(self):
+        if not self.puede_admin:
+            return
+        self.ex_t_id = 0
+        self.ex_t_nombre = ""
+        self.ex_error = ""
+        self.ex_dlg_tipo = True
+
+    def ex_abrir_editar_tipo(self, id_examen_tipo: int):
+        if not self.puede_admin:
+            return
+        t = next((x for x in self.ex_tipos if x["id_examen_tipo"] == id_examen_tipo), None)
+        if not t:
+            return
+        self.ex_t_id = id_examen_tipo
+        self.ex_t_nombre = t["examen_tipo"]
+        self.ex_error = ""
+        self.ex_dlg_tipo = True
+
+    def ex_cancelar_tipo(self):
+        self.ex_dlg_tipo = False
+        self.ex_error = ""
+
+    def ex_guardar_tipo(self):
+        if not self.puede_admin:
+            return
+        nombre = self.ex_t_nombre.strip()
+        if not nombre:
+            self.ex_error = "El nombre del tipo es obligatorio."
+            return
+        try:
+            with Session(get_engine()) as s:
+                if self.ex_t_id:
+                    actualizar_examen_tipo(s, self.ex_t_id, nombre)
+                else:
+                    crear_examen_tipo(s, nombre)
+                self.ex_tipos = listar_examen_tipos(s)
+        except Exception as e:
+            self.ex_error = f"Error: {str(e)}"
+            return
+        self.ex_dlg_tipo = False
+        self.ex_error = ""
+        self.ex_ok = "Tipo de examen guardado."
+
+    def ex_eliminar_tipo(self, id_examen_tipo: int):
+        if not self.puede_admin:
+            return
+        try:
+            with Session(get_engine()) as s:
+                eliminar_examen_tipo(s, id_examen_tipo)
+                self.ex_tipos = listar_examen_tipos(s)
+        except Exception as e:
+            self.ex_error = str(e)
+            return
+        if self.ex_tipo_sel == id_examen_tipo:
+            self.ex_tipo_sel = 0
+            self.ex_tipo_sel_nombre = ""
+            self.ex_catalogo = []
+        self.ex_ok = "Tipo de examen eliminado."
+
+    # ── Catálogo: nuevo / editar ──────────────────────────────────────────────
+
+    def ex_abrir_nuevo_catalogo(self):
+        if not self.puede_admin or not self.ex_tipo_sel:
+            return
+        self.ex_c_id = 0
+        self.ex_c_alias = ""
+        self.ex_c_nombre = ""
+        self.ex_error = ""
+        self.ex_dlg_catalogo = True
+
+    def ex_abrir_editar_catalogo(self, id_examen: int):
+        if not self.puede_admin:
+            return
+        c = next((x for x in self.ex_catalogo if x["id_examen"] == id_examen), None)
+        if not c:
+            return
+        self.ex_c_id = id_examen
+        self.ex_c_alias = c["examen_alias"]
+        self.ex_c_nombre = c["examen_nombre"]
+        self.ex_error = ""
+        self.ex_dlg_catalogo = True
+
+    def ex_cancelar_catalogo(self):
+        self.ex_dlg_catalogo = False
+        self.ex_error = ""
+
+    def ex_guardar_catalogo(self):
+        if not self.puede_admin or not self.ex_tipo_sel:
+            return
+        alias = self.ex_c_alias.strip().upper()
+        nombre = self.ex_c_nombre.strip().upper()
+        if not nombre:
+            self.ex_error = "El nombre del examen es obligatorio."
+            return
+        try:
+            with Session(get_engine()) as s:
+                if self.ex_c_id:
+                    actualizar_examen_catalogo(s, self.ex_c_id, alias, nombre)
+                else:
+                    crear_examen_catalogo(s, self.ex_tipo_sel, alias, nombre)
+                self.ex_catalogo = listar_examen_catalogo(s, self.ex_tipo_sel)
+        except Exception as e:
+            self.ex_error = f"Error: {str(e)}"
+            return
+        self.ex_dlg_catalogo = False
+        self.ex_error = ""
+        self.ex_ok = "Examen de catálogo guardado."
+
+    def ex_eliminar_catalogo(self, id_examen: int):
+        if not self.puede_admin:
+            return
+        try:
+            with Session(get_engine()) as s:
+                eliminar_examen_catalogo(s, id_examen)
+                self.ex_catalogo = listar_examen_catalogo(s, self.ex_tipo_sel)
+        except Exception as e:
+            self.ex_error = str(e)
+            return
+        self.ex_ok = "Examen de catálogo eliminado."
+
+    def ex_cerrar_ok(self):
+        self.ex_ok = ""

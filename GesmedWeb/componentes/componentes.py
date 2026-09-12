@@ -1,5 +1,5 @@
 import reflex as rx
-from ..state import State, NuevoDiagnosticoState, PrescripcionState, NuevoAntFamiliarState, NuevaAlergiaState,CertificadoState
+from ..state import State, NuevoDiagnosticoState, PrescripcionState, NuevoAntFamiliarState, NuevaAlergiaState,CertificadoState, AtencionState
 from ..querys.querys import edad
 from ..modelos.mis_modelos import Paciente,Atencion
 from .colores import (
@@ -10,6 +10,7 @@ from .colores import (
     SOAP_FIELD_BORDER,SOAP_FONDO,PRESCRIPCION_FONDO,PEDIDO_FONDO,RESULTADO_FONDO,
     PACIENTE_AJENO_LISTA_COLOR,
     PACIENTE_DISPONIBLE_LISTA_COLOR,
+    INTERCONSULTA_COLOR,
 )
 
 
@@ -324,12 +325,48 @@ _CELL_HEADER_PRES = {"padding_y": "2px", "padding_x": "4px", "font_size": "11px"
 
 def _fila_atencion(a: dict) -> rx.Component:
     return rx.table.row(
-        rx.table.cell(a['fecha_atencion'], **{**_CELL_ATEN, "white_space": "nowrap", "width": "300px"}),
+        rx.table.cell(
+            rx.hstack(
+                rx.vstack(
+                    rx.text(a['fecha_atencion']),
+                    rx.cond(
+                        a['es_interconsulta'],
+                        rx.text(a['nombre_medico_auxiliar'], font_size="10px", color=INTERCONSULTA_COLOR),
+                        rx.fragment(),
+                    ),
+                    spacing="0",
+                    align_items="start",
+                ),
+                rx.cond(
+                    a['puede_editar_hoy'],
+                    rx.icon(
+                        "pencil",
+                        size=16,
+                        cursor="pointer",
+                        title="Editar atención",
+                        on_click=[
+                            State.selecciona_atencion(a['id_atencion']).stop_propagation,
+                            AtencionState.editar_atencion_historica.stop_propagation,
+                        ],
+                    ),
+                    rx.fragment(),
+                ),
+                spacing="2",
+                align="center",
+            ),
+            **{**_CELL_ATEN, "white_space": "nowrap", "width": "300px"},
+            color=rx.cond(a['es_interconsulta'], INTERCONSULTA_COLOR, "inherit"),
+        ),
         rx.table.cell(a['codigos_cie10'], **_CELL_ATEN,
-            color=rx.cond(State.filtro_diagnostico_activo, COLOR_RESALTA_TEXTO, "inherit"),
+            color=rx.cond(
+                a['es_interconsulta'], INTERCONSULTA_COLOR,
+                rx.cond(State.filtro_diagnostico_activo, COLOR_RESALTA_TEXTO, "inherit"),
+            ),
             font_weight=rx.cond(State.filtro_diagnostico_activo, "700", "400"),
         ),
-        rx.table.cell(a['motivo_consulta'], **{**_CELL_ATEN, "width": "100%"}),
+        rx.table.cell(a['motivo_consulta'], **{**_CELL_ATEN, "width": "100%"},
+            color=rx.cond(a['es_interconsulta'], INTERCONSULTA_COLOR, "inherit"),
+        ),
         on_click=State.selecciona_atencion(a['id_atencion']),
         cursor="pointer",
         background=rx.cond(
@@ -1049,15 +1086,8 @@ def panel_historia_atencion() -> rx.Component:
             background="white",
             overflow="hidden",
         ),
-        rx.box(
-            rx.center(
-                rx.text(
-                    "Seleccione una atención del historial",
-                    color="var(--gray-9)",
-                    font_size="13px",
-                ),
-                height="100%",
-            ),
+        rx.center(
+            rx.text("Seleccione una atención del historial", color="var(--gray-9)", font_size="13px"),
             width="100%",
             height="100%",
             background="white",

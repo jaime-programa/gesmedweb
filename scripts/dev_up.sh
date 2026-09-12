@@ -46,5 +46,6 @@ done
 
 sleep 1
 
-echo "Iniciando reflex run..."
-exec .virtual/bin/reflex run
+echo "Listo"
+#echo "Iniciando reflex run..."
+#exec .virtual/bin/reflex run

@@ -10,7 +10,10 @@ from ..modelos.mis_modelos import (
     ListaSignosVitales, SignosVitales,
     ExamenesLaboratorioCatalogo, ExamenesLaboratorioGrupo, ExamenesLaboratorioPedido,
     AntecedenteFamiliar,
+    OtrosExamenesTipo, OtrosExamenesCatalogo,
+    SolicitudInterconsulta, Interconsulta,
 )
+from sqlalchemy.exc import IntegrityError
 from decimal import Decimal
 from ..crypto import GesmedCrypto
 from ..utils.config import leer_config, escribir_config
@@ -88,6 +91,16 @@ def carga_medicos():
                  for r in resultados}
     return medicos
 
+def listar_medicos_para_interconsulta(session, excluir_id: int) -> list[dict]:
+    """Médicos activos disponibles como auxiliar (todos menos el principal)."""
+    rows = session.exec(
+        select(Points.id_medico, Points.nombre_medico)
+        .where(Points.estado == 1, Points.id_medico != excluir_id)
+        .order_by(asc(Points.nombre_medico))
+    ).all()
+    return [{"id_medico": r.id_medico, "nombre_medico": r.nombre_medico} for r in rows]
+
+
 def carga_seguros() -> list[str]:
     with Session(get_engine()) as session:
         statement = select(SeguroMedico.nombre_seguro).where(SeguroMedico.esta_activo == 1).order_by(SeguroMedico.nombre_seguro)
@@ -114,14 +127,18 @@ def consultar_pacientes_por_nombre(session, filtro: str, medico_id: int = 1, sol
         # todavía (recién creados, sin médico "dueño" — cualquiera debe poder
         # verlos para poder registrarles su primera atención). No restringe
         # el conteo de arriba (que sigue mostrando el total de cualquier médico).
-        statement = statement.where(
-            or_(
-                Paciente.nro_hclinica.in_(
-                    select(Atencion.lk_paciente).where(Atencion.lk_medico == medico_id)
-                ),
-                Paciente.nro_hclinica.not_in(select(Atencion.lk_paciente)),
-            )
-        )
+        # Además, si el médico tiene una solicitud de interconsulta vigente
+        # para un paciente puntual (como auxiliar), lo ve aunque no sea suyo.
+        pacientes_interconsulta = _pacientes_interconsulta_activos(session, medico_id)
+        condiciones = [
+            Paciente.nro_hclinica.in_(
+                select(Atencion.lk_paciente).where(Atencion.lk_medico == medico_id)
+            ),
+            Paciente.nro_hclinica.not_in(select(Atencion.lk_paciente)),
+        ]
+        if pacientes_interconsulta:
+            condiciones.append(Paciente.nro_hclinica.in_(pacientes_interconsulta))
+        statement = statement.where(or_(*condiciones))
     pacientes = session.exec(statement).all()
 
     # Pacientes "propios" del médico logueado (con al menos una atención suya),
@@ -159,7 +176,7 @@ def consultar_pacientes_por_nombre(session, filtro: str, medico_id: int = 1, sol
 
     return [crypto.desencriptar_campos(r, ["nombre_completo", "cedula_id"]) for r in registros]
 
-def historial_atenciones_con_cie10(session,paciente:int,filtro:str) -> List[dict]: 
+def historial_atenciones_con_cie10(session,paciente:int,filtro:str,medico_id:int=0) -> List[dict]:
     if len (filtro)>0:
         stmt = (
         select(
@@ -209,6 +226,17 @@ def historial_atenciones_con_cie10(session,paciente:int,filtro:str) -> List[dict
 
     results = session.exec(stmt).all()
 
+    # Atenciones producto de interconsulta: {lk_atencion: nombre_medico_auxiliar}
+    ids_atenciones = [row.id_atencion for row in results]
+    nombres_auxiliar: dict[int, str] = {}
+    if ids_atenciones:
+        filas_ic = session.exec(
+            select(Interconsulta.lk_atencion, Points.nombre_medico)
+            .join(Points, Points.id_medico == Interconsulta.lk_medico_auxiliar)
+            .where(Interconsulta.lk_atencion.in_(ids_atenciones))
+        ).all()
+        nombres_auxiliar = {lk_atencion: nombre for lk_atencion, nombre in filas_ic}
+
     # Convertir los resultados en una lista de diccionarios
     lista_atenciones = [
         {
@@ -224,7 +252,12 @@ def historial_atenciones_con_cie10(session,paciente:int,filtro:str) -> List[dict
             "analisis":row.analisis,
             "plan":row.plan,
             "codigos_cie10": row.codigos_cie10.split(','),
-            
+            "es_interconsulta": row.id_atencion in nombres_auxiliar,
+            "nombre_medico_auxiliar": nombres_auxiliar.get(row.id_atencion, ""),
+            "puede_editar_hoy": (
+                row.lk_medico == medico_id
+                and row.fecha_atencion.date() == datetime.date.today()
+            ),
         }
         for row in results
     ]
@@ -589,10 +622,18 @@ def actualizar_atencion(
     objetivo: str,
     analisis: str,
     plan: str,
+    medico_id: int,
 ) -> None:
+    """Solo el médico autor (lk_medico) puede editar su atención, y solo el
+    mismo día de fecha_atencion. Ninguna atención de días anteriores es
+    editable, ni por su autor ni por ningún otro médico."""
     atencion = session.get(Atencion, id_atencion)
     if not atencion:
         return
+    if atencion.lk_medico != medico_id:
+        raise ValueError("No puede editar una atención registrada por otro médico.")
+    if atencion.fecha_atencion.date() != datetime.date.today():
+        raise ValueError("Solo se puede editar una atención el mismo día en que fue registrada.")
     atencion.motivo_consulta   = motivo
     atencion.revision_sistemas = revision
     atencion.subjetivo         = subjetivo
@@ -862,6 +903,131 @@ def estado_propiedad_paciente(session, nro_hclinica: int, medico_id: int) -> tup
     return (tiene_propia is not None), False
 
 
+# ── Interconsulta ─────────────────────────────────────────────────────────────
+# Modelo de 2 tablas:
+#   solicitud_interconsulta: habilita que el médico auxiliar "vea" en su
+#     listado de pacientes a UN paciente puntual (lk_paciente) del médico
+#     principal, mientras la solicitud esté vigente (estatus='activa' y no
+#     vencida por fecha_expiracion).
+#   interconsulta: registra, por atención puntual generada por el auxiliar,
+#     quién la generó — sirve para marcarla en la UI y no depende de que la
+#     solicitud siga vigente (queda como constancia histórica permanente).
+
+def _cerrar_solicitudes_vencidas(session) -> None:
+    """Cierre perezoso: pasa a 'finalizada' toda solicitud vigente cuya
+    fecha_expiracion ya pasó. Se invoca antes de cualquier consulta que
+    dependa del estatus de una solicitud."""
+    hoy = datetime.date.today()
+    vencidas = session.exec(
+        select(SolicitudInterconsulta).where(
+            SolicitudInterconsulta.estatus == "activa",
+            SolicitudInterconsulta.fecha_expiracion < hoy,
+        )
+    ).all()
+    for s in vencidas:
+        s.estatus = "finalizada"
+        session.add(s)
+    if vencidas:
+        session.commit()
+
+
+def _pacientes_interconsulta_activos(session, medico_auxiliar_id: int) -> list[int]:
+    """IDs de pacientes que medico_auxiliar_id puede ver por tener al menos
+    una solicitud de interconsulta vigente para ese paciente."""
+    _cerrar_solicitudes_vencidas(session)
+    return list(session.exec(
+        select(SolicitudInterconsulta.lk_paciente).where(
+            SolicitudInterconsulta.lk_medico_auxiliar == medico_auxiliar_id,
+            SolicitudInterconsulta.estatus == "activa",
+        )
+    ).all())
+
+
+def crear_solicitud_interconsulta(
+    session, lk_paciente: int, lk_medico_principal: int, lk_medico_auxiliar: int,
+    motivo: str, fecha_expiracion: datetime.date | None = None,
+) -> SolicitudInterconsulta:
+    hoy = datetime.date.today()
+    nueva = SolicitudInterconsulta(
+        lk_paciente=lk_paciente,
+        lk_medico_principal=lk_medico_principal,
+        lk_medico_auxiliar=lk_medico_auxiliar,
+        fecha_solicitud=hoy,
+        fecha_expiracion=fecha_expiracion or (hoy + datetime.timedelta(days=30)),
+        motivo=motivo,
+        estatus="activa",
+    )
+    session.add(nueva)
+    session.commit()
+    session.refresh(nueva)
+    return nueva
+
+
+def listar_solicitudes_interconsulta(session, medico_id: int) -> list[dict]:
+    """Solicitudes donde medico_id participa, como principal o auxiliar."""
+    _cerrar_solicitudes_vencidas(session)
+    rows = session.exec(
+        select(SolicitudInterconsulta).where(
+            or_(
+                SolicitudInterconsulta.lk_medico_principal == medico_id,
+                SolicitudInterconsulta.lk_medico_auxiliar == medico_id,
+            )
+        ).order_by(desc(SolicitudInterconsulta.fecha_solicitud))
+    ).all()
+    return [
+        {
+            "id_solicitud":        r.id_solicitud,
+            "lk_paciente":         r.lk_paciente,
+            "lk_medico_principal": r.lk_medico_principal,
+            "lk_medico_auxiliar":  r.lk_medico_auxiliar,
+            "fecha_solicitud":     str(r.fecha_solicitud),
+            "fecha_expiracion":    str(r.fecha_expiracion),
+            "motivo":              r.motivo,
+            "estatus":             r.estatus,
+        }
+        for r in rows
+    ]
+
+
+def finalizar_solicitud_interconsulta(session, id_solicitud: int) -> None:
+    """El médico auxiliar da por terminada la interconsulta manualmente."""
+    s = session.get(SolicitudInterconsulta, id_solicitud)
+    if not s:
+        return
+    s.estatus = "finalizada"
+    session.commit()
+
+
+def es_atencion_bajo_interconsulta(session, nro_hclinica: int, medico_auxiliar_id: int) -> bool:
+    """True si medico_auxiliar_id atiende a este paciente amparado en una
+    solicitud de interconsulta vigente para ese paciente puntual."""
+    _cerrar_solicitudes_vencidas(session)
+    solicitud = session.exec(
+        select(SolicitudInterconsulta.id_solicitud).where(
+            SolicitudInterconsulta.lk_paciente == nro_hclinica,
+            SolicitudInterconsulta.lk_medico_auxiliar == medico_auxiliar_id,
+            SolicitudInterconsulta.estatus == "activa",
+        ).limit(1)
+    ).first()
+    return solicitud is not None
+
+
+def registrar_interconsulta(session, lk_atencion: int, lk_medico_auxiliar: int) -> None:
+    """Se invoca al grabar el SOAP de una atención hecha por un médico
+    auxiliar bajo una interconsulta vigente, para dejar constancia de autoría."""
+    nueva = Interconsulta(lk_atencion=lk_atencion, lk_medico_auxiliar=lk_medico_auxiliar)
+    session.add(nueva)
+    session.commit()
+
+
+def cerrar_interconsulta(session, id_interconsulta: int, reporte_final: str) -> None:
+    ic = session.get(Interconsulta, id_interconsulta)
+    if not ic:
+        return
+    ic.reporte_final = reporte_final
+    session.commit()
+
+
 def listar_usuarios(session) -> list[dict]:
     rows = session.exec(select(Points).order_by(asc(Points.nombre_medico))).all()
     return [
@@ -932,6 +1098,102 @@ def resetear_clave(session, id_medico: int, nueva_clave: str) -> None:
     u.clave = clave_hash
     session.add(u)
     session.commit()
+
+
+# ── Mantenimiento: tipos y catálogo de exámenes ──────────────────────────────
+
+def listar_examen_tipos(session) -> list[dict]:
+    rows = session.exec(
+        select(OtrosExamenesTipo).order_by(asc(OtrosExamenesTipo.examen_tipo))
+    ).all()
+    return [
+        {"id_examen_tipo": r.id_examen_tipo, "examen_tipo": r.examen_tipo}
+        for r in rows
+    ]
+
+
+def crear_examen_tipo(session, nombre: str) -> OtrosExamenesTipo:
+    nuevo = OtrosExamenesTipo(examen_tipo=nombre)
+    session.add(nuevo)
+    session.commit()
+    session.refresh(nuevo)
+    return nuevo
+
+
+def actualizar_examen_tipo(session, id_examen_tipo: int, nombre: str) -> None:
+    t = session.get(OtrosExamenesTipo, id_examen_tipo)
+    if not t:
+        return
+    t.examen_tipo = nombre
+    session.add(t)
+    session.commit()
+
+
+def eliminar_examen_tipo(session, id_examen_tipo: int) -> None:
+    t = session.get(OtrosExamenesTipo, id_examen_tipo)
+    if not t:
+        return
+    session.delete(t)
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        raise ValueError(
+            "No se puede eliminar: existen exámenes del catálogo asociados a este tipo."
+        )
+
+
+def listar_examen_catalogo(session, lk_examen_tipo: int) -> list[dict]:
+    rows = session.exec(
+        select(OtrosExamenesCatalogo)
+        .where(OtrosExamenesCatalogo.lk_examen_tipo == lk_examen_tipo)
+        .order_by(asc(OtrosExamenesCatalogo.examen_nombre))
+    ).all()
+    return [
+        {
+            "id_examen": r.id_examen,
+            "lk_examen_tipo": r.lk_examen_tipo,
+            "examen_alias": r.examen_alias,
+            "examen_nombre": r.examen_nombre,
+        }
+        for r in rows
+    ]
+
+
+def crear_examen_catalogo(session, lk_examen_tipo: int, alias: str, nombre: str) -> OtrosExamenesCatalogo:
+    nuevo = OtrosExamenesCatalogo(
+        lk_examen_tipo=lk_examen_tipo,
+        examen_alias=alias.upper(),
+        examen_nombre=nombre.upper(),
+    )
+    session.add(nuevo)
+    session.commit()
+    session.refresh(nuevo)
+    return nuevo
+
+
+def actualizar_examen_catalogo(session, id_examen: int, alias: str, nombre: str) -> None:
+    c = session.get(OtrosExamenesCatalogo, id_examen)
+    if not c:
+        return
+    c.examen_alias = alias.upper()
+    c.examen_nombre = nombre.upper()
+    session.add(c)
+    session.commit()
+
+
+def eliminar_examen_catalogo(session, id_examen: int) -> None:
+    c = session.get(OtrosExamenesCatalogo, id_examen)
+    if not c:
+        return
+    session.delete(c)
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        raise ValueError(
+            "No se puede eliminar: este examen está siendo usado en uno o más pedidos."
+        )
 
 
 def listar_ant_familiares(session, lk_paciente: int, medico_id: int) -> list[dict]:

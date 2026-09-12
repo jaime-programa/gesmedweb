@@ -1,4 +1,4 @@
--- parametros_fijos.sql — generado por migrations/parametros_fijos.py --congelar
+-- parametros_fijos.sql — generado por migrations/parametros_fijos.py --extraer
 -- Contiene estructura + datos de los catálogos fijos de gesmed (sin `points`).
 SET FOREIGN_KEY_CHECKS=0;
 
@@ -12480,7 +12480,9 @@ CREATE TABLE `medicamentos` (
   `nombre_comercial` varchar(30) COLLATE utf8_spanish2_ci NOT NULL,
   `tipo` int(2) NOT NULL DEFAULT 1,
   `es_activo` tinyint(1) NOT NULL,
-  PRIMARY KEY (`cod_gen`)
+  PRIMARY KEY (`cod_gen`),
+  KEY `fk_medicamentos_tipo` (`tipo`),
+  CONSTRAINT `fk_medicamentos_tipo` FOREIGN KEY (`tipo`) REFERENCES `medicamento_tipo` (`id_tipo`)
 ) ENGINE=InnoDB AUTO_INCREMENT=474 DEFAULT CHARSET=utf8 COLLATE=utf8_spanish2_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -13426,7 +13428,7 @@ CREATE TABLE `examen_catalogo` (
   PRIMARY KEY (`id_examen`),
   KEY `fk_ec_tipo` (`lk_examen_tipo`),
   CONSTRAINT `fk_ec_tipo` FOREIGN KEY (`lk_examen_tipo`) REFERENCES `examen_tipo` (`id_examen_tipo`)
-) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -13442,6 +13444,7 @@ INSERT INTO `examen_catalogo` (`id_examen`, `lk_examen_tipo`, `examen_alias`, `e
 INSERT INTO `examen_catalogo` (`id_examen`, `lk_examen_tipo`, `examen_alias`, `examen_nombre`) VALUES (5,1,'ECO','ECOGRAFÍA');
 INSERT INTO `examen_catalogo` (`id_examen`, `lk_examen_tipo`, `examen_alias`, `examen_nombre`) VALUES (6,2,'EE','ELECTRO ENCEFALOGRAMA');
 INSERT INTO `examen_catalogo` (`id_examen`, `lk_examen_tipo`, `examen_alias`, `examen_nombre`) VALUES (7,3,'LABORATORIO','ANÁLISIS DE LABORATORIO');
+INSERT INTO `examen_catalogo` (`id_examen`, `lk_examen_tipo`, `examen_alias`, `examen_nombre`) VALUES (8,4,'RASP','RASPADOS DE PIEL');
 /*!40000 ALTER TABLE `examen_catalogo` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -13456,7 +13459,7 @@ CREATE TABLE `examen_tipo` (
   `id_examen_tipo` int(11) NOT NULL AUTO_INCREMENT,
   `examen_tipo` varchar(40) NOT NULL DEFAULT '',
   PRIMARY KEY (`id_examen_tipo`)
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -13468,6 +13471,7 @@ LOCK TABLES `examen_tipo` WRITE;
 INSERT INTO `examen_tipo` (`id_examen_tipo`, `examen_tipo`) VALUES (1,'Imagen');
 INSERT INTO `examen_tipo` (`id_examen_tipo`, `examen_tipo`) VALUES (2,'Neurologia');
 INSERT INTO `examen_tipo` (`id_examen_tipo`, `examen_tipo`) VALUES (3,'Laboratorio');
+INSERT INTO `examen_tipo` (`id_examen_tipo`, `examen_tipo`) VALUES (4,'Patología');
 /*!40000 ALTER TABLE `examen_tipo` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -13939,6 +13943,6 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-03 21:41:52
+-- Dump completed on 2026-09-09 15:31:32
 
 SET FOREIGN_KEY_CHECKS=1;

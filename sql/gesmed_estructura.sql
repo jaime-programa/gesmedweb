@@ -75,7 +75,7 @@ CREATE TABLE `atencion` (
   KEY `lk_medico` (`lk_medico`),
   CONSTRAINT `atencion_ibfk_1` FOREIGN KEY (`lk_paciente`) REFERENCES `paciente` (`nro_hclinica`) ON UPDATE CASCADE,
   CONSTRAINT `atencion_ibfk_2` FOREIGN KEY (`lk_medico`) REFERENCES `points` (`id_medico`) ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=1180 DEFAULT CHARSET=utf8 COLLATE=utf8_spanish2_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1182 DEFAULT CHARSET=utf8 COLLATE=utf8_spanish2_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -181,7 +181,7 @@ CREATE TABLE `cita` (
   CONSTRAINT `cita_ibfk_1` FOREIGN KEY (`lk_paciente`) REFERENCES `paciente` (`nro_hclinica`) ON DELETE SET NULL,
   CONSTRAINT `cita_ibfk_2` FOREIGN KEY (`lk_medico`) REFERENCES `points` (`id_medico`),
   CONSTRAINT `cita_ibfk_3` FOREIGN KEY (`lk_tipo_cita`) REFERENCES `tipo_cita` (`id_tipo_cita`)
-) ENGINE=InnoDB AUTO_INCREMENT=18 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=19 DEFAULT CHARSET=utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -209,7 +209,7 @@ CREATE TABLE `diagnostico` (
   CONSTRAINT `diagnostico_ibfk_1` FOREIGN KEY (`lk_paciente`) REFERENCES `paciente` (`nro_hclinica`) ON UPDATE CASCADE,
   CONSTRAINT `diagnostico_ibfk_2` FOREIGN KEY (`lk_cie10`) REFERENCES `cie10` (`cod_cie10`) ON UPDATE CASCADE,
   CONSTRAINT `diagnostico_ibfk_3` FOREIGN KEY (`lk_medico`) REFERENCES `points` (`id_medico`) ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=2116 DEFAULT CHARSET=utf8 COLLATE=utf8_spanish2_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=2117 DEFAULT CHARSET=utf8 COLLATE=utf8_spanish2_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -227,7 +227,7 @@ CREATE TABLE `examen_catalogo` (
   PRIMARY KEY (`id_examen`),
   KEY `fk_ec_tipo` (`lk_examen_tipo`),
   CONSTRAINT `fk_ec_tipo` FOREIGN KEY (`lk_examen_tipo`) REFERENCES `examen_tipo` (`id_examen_tipo`)
-) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -250,7 +250,7 @@ CREATE TABLE `examen_pedido` (
   CONSTRAINT `fk_ep_atencion` FOREIGN KEY (`lk_atencion`) REFERENCES `atencion` (`id_atencion`),
   CONSTRAINT `fk_ep_catalogo` FOREIGN KEY (`lk_catalogo`) REFERENCES `examen_catalogo` (`id_examen`),
   CONSTRAINT `fk_ep_diagnostico` FOREIGN KEY (`lk_diagnostico`) REFERENCES `diagnostico` (`id_diagnostico`)
-) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -264,7 +264,7 @@ CREATE TABLE `examen_tipo` (
   `id_examen_tipo` int(11) NOT NULL AUTO_INCREMENT,
   `examen_tipo` varchar(40) NOT NULL DEFAULT '',
   PRIMARY KEY (`id_examen_tipo`)
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -369,7 +369,27 @@ CREATE TABLE `imagen` (
   KEY `fk_imagen_atencion` (`lk_atencion`),
   CONSTRAINT `fk_imagen_atencion` FOREIGN KEY (`lk_atencion`) REFERENCES `atencion` (`id_atencion`),
   CONSTRAINT `fk_imagen_resultado` FOREIGN KEY (`lk_resultado_imagen`) REFERENCES `resultados_imagen` (`id_resultado`)
-) ENGINE=InnoDB AUTO_INCREMENT=79 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish2_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=89 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish2_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `interconsulta`
+--
+
+DROP TABLE IF EXISTS `interconsulta`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `interconsulta` (
+  `id_interconsulta` int(11) NOT NULL AUTO_INCREMENT,
+  `lk_atencion` int(11) NOT NULL,
+  `lk_medico_auxiliar` int(11) NOT NULL,
+  `reporte_final` text DEFAULT NULL,
+  PRIMARY KEY (`id_interconsulta`),
+  KEY `lk_atencion` (`lk_atencion`),
+  KEY `lk_medico_auxiliar` (`lk_medico_auxiliar`),
+  CONSTRAINT `interconsulta_ibfk_1` FOREIGN KEY (`lk_atencion`) REFERENCES `atencion` (`id_atencion`) ON DELETE CASCADE,
+  CONSTRAINT `interconsulta_ibfk_2` FOREIGN KEY (`lk_medico_auxiliar`) REFERENCES `points` (`id_medico`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -419,7 +439,7 @@ CREATE TABLE `marca` (
   PRIMARY KEY (`id_marca`),
   KEY `fk_marca_imagen` (`lk_imagen`),
   CONSTRAINT `fk_marca_imagen` FOREIGN KEY (`lk_imagen`) REFERENCES `imagen` (`id_imagen`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=42 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish2_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=45 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish2_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -496,7 +516,7 @@ CREATE TABLE `paciente` (
   `fecha_creacion` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`nro_hclinica`),
   KEY `seguro` (`seguro`)
-) ENGINE=InnoDB AUTO_INCREMENT=1173 DEFAULT CHARSET=utf8 COLLATE=utf8_spanish2_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1175 DEFAULT CHARSET=utf8 COLLATE=utf8_spanish2_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -620,7 +640,7 @@ CREATE TABLE `rel_atencion_diagnostico` (
   KEY `lk_diagnostico` (`lk_diagnostico`),
   CONSTRAINT `rel_atencion_diagnostico_ibfk_1` FOREIGN KEY (`lk_atencion`) REFERENCES `atencion` (`id_atencion`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `rel_atencion_diagnostico_ibfk_3` FOREIGN KEY (`lk_diagnostico`) REFERENCES `diagnostico` (`id_diagnostico`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=2802 DEFAULT CHARSET=utf8 COLLATE=utf8_spanish2_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=2804 DEFAULT CHARSET=utf8 COLLATE=utf8_spanish2_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -743,7 +763,7 @@ CREATE TABLE `resultados_imagen` (
   CONSTRAINT `fk_resimg_examen` FOREIGN KEY (`lk_examen`) REFERENCES `examen_catalogo` (`id_examen`),
   CONSTRAINT `fk_resimg_paciente` FOREIGN KEY (`lk_paciente`) REFERENCES `paciente` (`nro_hclinica`),
   CONSTRAINT `fk_resimg_pedido` FOREIGN KEY (`lk_pedido`) REFERENCES `examen_pedido` (`id_examen_pedido`)
-) ENGINE=InnoDB AUTO_INCREMENT=18 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish2_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=23 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish2_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -773,7 +793,7 @@ CREATE TABLE `resultados_laboratorio` (
   CONSTRAINT `fk_reslab_imagen` FOREIGN KEY (`lk_imagen_fuente`) REFERENCES `imagen` (`id_imagen`),
   CONSTRAINT `fk_reslab_paciente` FOREIGN KEY (`lk_paciente`) REFERENCES `paciente` (`nro_hclinica`),
   CONSTRAINT `fk_reslab_pedido` FOREIGN KEY (`lk_pedido`) REFERENCES `examenes_laboratorio_pedido` (`id_pedido`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish2_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish2_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -812,6 +832,32 @@ CREATE TABLE `signosvitales` (
   CONSTRAINT `fk_sv_atencion` FOREIGN KEY (`lk_atencion`) REFERENCES `atencion` (`id_atencion`),
   CONSTRAINT `fk_sv_tipo` FOREIGN KEY (`lk_signo_vital`) REFERENCES `lista_signosvitales` (`id_signo_vital`)
 ) ENGINE=InnoDB AUTO_INCREMENT=29 DEFAULT CHARSET=utf8mb4;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `solicitud_interconsulta`
+--
+
+DROP TABLE IF EXISTS `solicitud_interconsulta`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `solicitud_interconsulta` (
+  `id_solicitud` int(11) NOT NULL AUTO_INCREMENT,
+  `lk_paciente` int(11) NOT NULL,
+  `lk_medico_principal` int(11) NOT NULL,
+  `lk_medico_auxiliar` int(11) NOT NULL,
+  `fecha_solicitud` date NOT NULL,
+  `fecha_expiracion` date NOT NULL,
+  `motivo` text NOT NULL,
+  `estatus` varchar(10) NOT NULL DEFAULT 'activa' COMMENT 'activa | finalizada',
+  PRIMARY KEY (`id_solicitud`),
+  KEY `lk_paciente` (`lk_paciente`),
+  KEY `lk_medico_principal` (`lk_medico_principal`),
+  KEY `lk_medico_auxiliar` (`lk_medico_auxiliar`),
+  CONSTRAINT `solicitud_interconsulta_ibfk_1` FOREIGN KEY (`lk_paciente`) REFERENCES `paciente` (`nro_hclinica`) ON DELETE CASCADE,
+  CONSTRAINT `solicitud_interconsulta_ibfk_2` FOREIGN KEY (`lk_medico_principal`) REFERENCES `points` (`id_medico`),
+  CONSTRAINT `solicitud_interconsulta_ibfk_3` FOREIGN KEY (`lk_medico_auxiliar`) REFERENCES `points` (`id_medico`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -884,4 +930,4 @@ CREATE TABLE `tipo_cita` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-06 18:06:49
+-- Dump completed on 2026-09-09 23:15:10

@@ -18,10 +18,11 @@ from .paginas.atencion import index
 from .paginas.lista_pacientes import muestra_pacientes
 from .paginas.config_reportes import config_reportes
 from .paginas.config_usuarios import config_usuarios
+from .paginas.config_examenes import config_examenes
 import unicodedata
 from sqlalchemy import text
 from sqlmodel import Session, select
-from .state import State, ConfigReportesState, AdminUsuariosState, get_engine
+from .state import State, ConfigReportesState, AdminUsuariosState, ExamenesState, get_engine
 from .modelos.mis_modelos import OtrosExamenesTipo, Imagenes, Atencion, ResultadosImagenes
 from .utils.imagen_utils import leer_imagen as img_leer
 from .reportes.motor import generar_reporte, generar_reporte_multisheet
@@ -129,3 +130,5 @@ app.add_page(config_reportes, "/config/reportes",
              on_load=ConfigReportesState.cr_cargar_reportes)
 app.add_page(config_usuarios, "/config/usuarios",
              on_load=AdminUsuariosState.au_cargar)
+app.add_page(config_examenes, "/config/examenes",
+             on_load=ExamenesState.ex_cargar)

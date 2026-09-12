@@ -1,0 +1,15 @@
+[Unit]
+Description=GesmedWeb (Reflex)
+After=network-online.target mariadb.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=jaime
+WorkingDirectory=/opt/gesmedweb
+ExecStart=/opt/gesmedweb/.virtual/bin/reflex run --env prod
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

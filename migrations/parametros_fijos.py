@@ -15,7 +15,7 @@ Tablas cubiertas (catálogos fijos, no datos de pacientes):
 
 Modo de trabajo (igual patrón que orquestador.py: subprocess a mysqldump/mysql):
 
-    congelar()  → vuelca estructura + datos actuales de gesmed local a
+    extraer()  → vuelca estructura + datos actuales de gesmed local a
                   sql/parametros_fijos.sql (un solo archivo, con
                   --add-drop-table para que sea idempotente).
     instalar()  → aplica ese archivo contra la base de datos destino
@@ -24,7 +24,7 @@ Modo de trabajo (igual patrón que orquestador.py: subprocess a mysqldump/mysql)
 
 Uso:
     # Regenerar el snapshot a partir del gesmed local actual (cuando cambian catálogos)
-    .virtual/bin/python -m migrations.parametros_fijos --congelar
+    .virtual/bin/python -m migrations.parametros_fijos --extraer
 
     # Instalar/reinstalar las tablas de parámetros en la base destino
     .virtual/bin/python -m migrations.parametros_fijos --instalar
@@ -71,7 +71,7 @@ ARCHIVO_SNAPSHOT = _ROOT / "sql" / "parametros_fijos.sql"
 _DB_DEFAULT_URL = "mysql+pymysql://med_admin:gesmed01@localhost:3306/gesmed"
 
 
-def congelar() -> bool:
+def extraer() -> bool:
     """Vuelca estructura + datos actuales de TABLAS a un único archivo .sql."""
     p = _db_params("GESMED_DB_URL", _DB_DEFAULT_URL)
     ARCHIVO_SNAPSHOT.parent.mkdir(exist_ok=True)
@@ -93,7 +93,7 @@ def congelar() -> bool:
     try:
         with open(ARCHIVO_SNAPSHOT, "w") as f:
             f.write(
-                "-- parametros_fijos.sql — generado por migrations/parametros_fijos.py --congelar\n"
+                "-- parametros_fijos.sql — generado por migrations/parametros_fijos.py --extraer\n"
                 "-- Contiene estructura + datos de los catálogos fijos de gesmed (sin `points`).\n"
                 "SET FOREIGN_KEY_CHECKS=0;\n\n"
             )
@@ -119,7 +119,7 @@ def congelar() -> bool:
 def instalar() -> bool:
     """Aplica sql/parametros_fijos.sql contra la base de datos destino."""
     if not ARCHIVO_SNAPSHOT.exists():
-        print(f"  ✗ No existe {ARCHIVO_SNAPSHOT.relative_to(_ROOT)}. Ejecute primero --congelar.")
+        print(f"  ✗ No existe {ARCHIVO_SNAPSHOT.relative_to(_ROOT)}. Ejecute primero --extraer.")
         return False
 
     p = _db_params("GESMED_DB_URL", _DB_DEFAULT_URL)
@@ -152,9 +152,9 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Congela/instala las tablas de parámetros fijos de gesmed")
     grupo = parser.add_mutually_exclusive_group(required=True)
-    grupo.add_argument("--congelar", action="store_true", help="Vuelca el estado actual de gesmed local a sql/parametros_fijos.sql")
+    grupo.add_argument("--extraer", action="store_true", help="Vuelca el estado actual de gesmed local a sql/parametros_fijos.sql")
     grupo.add_argument("--instalar", action="store_true", help="Aplica sql/parametros_fijos.sql contra la base destino")
     args = parser.parse_args()
 
-    ok = congelar() if args.congelar else instalar()
+    ok = extraer() if args.extraer else instalar()
     sys.exit(0 if ok else 1)

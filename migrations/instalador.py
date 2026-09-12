@@ -424,6 +424,8 @@ def main() -> int:
 
     print("\n" + "═" * 60)
     print("  INSTALACIÓN COMPLETA")
+    print(":"*20)
+    print("  Revise que la IP del servidor esté registrada en el entorno")
     print("═" * 60)
     return 0
 
